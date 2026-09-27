@@ -39,6 +39,20 @@ struct ComponentAxisStats {
   double average_distance_m = 0.0;
 };
 
+struct ComponentShapeStats {
+  std::size_t point_count = 0;
+  double min_x = std::numeric_limits<double>::infinity();
+  double min_y = std::numeric_limits<double>::infinity();
+  double min_z = std::numeric_limits<double>::infinity();
+  double max_x = -std::numeric_limits<double>::infinity();
+  double max_y = -std::numeric_limits<double>::infinity();
+  double max_z = -std::numeric_limits<double>::infinity();
+  double centroid_x = 0.0;
+  double centroid_y = 0.0;
+  double centroid_z = 0.0;
+  double nearest_distance_m = std::numeric_limits<double>::infinity();
+};
+
 struct ArcGeometry {
   bool valid = false;
   double centre_x = 0.0;
@@ -192,6 +206,87 @@ ComponentAxisStats ComputeComponentAxisStats(const float* xyz,
   }
   if (!valid) return {};
   return {true, max_s - min_s, distance_sum / static_cast<double>(valid)};
+}
+
+ComponentShapeStats ComputeComponentShapeStats(
+    const float* xyz, const std::vector<std::size_t>& component) {
+  if (component.empty()) throw std::invalid_argument("component must not be empty");
+  ComponentShapeStats stats;
+  stats.point_count = component.size();
+  double sum_x = 0.0;
+  double sum_y = 0.0;
+  double sum_z = 0.0;
+  for (const std::size_t source_index : component) {
+    const Point3f point{xyz[source_index * 3], xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]};
+    if (!IsFinite(point)) throw std::invalid_argument("xyz must be finite");
+    stats.min_x = std::min(stats.min_x, static_cast<double>(point.x));
+    stats.min_y = std::min(stats.min_y, static_cast<double>(point.y));
+    stats.min_z = std::min(stats.min_z, static_cast<double>(point.z));
+    stats.max_x = std::max(stats.max_x, static_cast<double>(point.x));
+    stats.max_y = std::max(stats.max_y, static_cast<double>(point.y));
+    stats.max_z = std::max(stats.max_z, static_cast<double>(point.z));
+    sum_x += point.x;
+    sum_y += point.y;
+    sum_z += point.z;
+    stats.nearest_distance_m = std::min(stats.nearest_distance_m, std::hypot(
+        static_cast<double>(point.x), point.y, point.z));
+  }
+  const double count = static_cast<double>(component.size());
+  stats.centroid_x = sum_x / count;
+  stats.centroid_y = sum_y / count;
+  stats.centroid_z = sum_z / count;
+  return stats;
+}
+
+bool BaselineV3BoundaryWarning(const ComponentShapeStats& stats) {
+  const double extent_x = stats.max_x - stats.min_x;
+  const double extent_y = stats.max_y - stats.min_y;
+  const double extent_z = stats.max_z - stats.min_z;
+  return (stats.centroid_x < -1.30 && extent_x < 0.25 && extent_z > 1.50) ||
+         (stats.centroid_z > 1.00 && extent_x > 1.00 && extent_y > 1.00 && extent_z > 0.30);
+}
+
+void ResetReportableOutputs(AnalysisResult& result) {
+  result.reportable_core_count = 0;
+  result.ignored_noise_count = 0;
+  result.baseline_v3_geometry_obstacle_count = 0;
+  result.baseline_v3_boundary_warning_count = 0;
+  result.baseline_v3_model_assist_count = 0;
+  result.reportable_core_source_indices.clear();
+  result.ignored_noise_source_indices.clear();
+  result.baseline_v3_geometry_obstacle_source_indices.clear();
+  result.baseline_v3_boundary_warning_source_indices.clear();
+  result.baseline_v3_model_assist_source_indices.clear();
+  result.nearest_reportable_core = {};
+}
+
+void FinalizeReportableOutputs(const float* xyz, AnalysisResult& result) {
+  auto sort_unique = [](std::vector<std::size_t>& values) {
+    std::sort(values.begin(), values.end());
+    values.erase(std::unique(values.begin(), values.end()), values.end());
+  };
+  sort_unique(result.reportable_core_source_indices);
+  sort_unique(result.ignored_noise_source_indices);
+  sort_unique(result.baseline_v3_geometry_obstacle_source_indices);
+  sort_unique(result.baseline_v3_boundary_warning_source_indices);
+  sort_unique(result.baseline_v3_model_assist_source_indices);
+  result.reportable_core_count = result.reportable_core_source_indices.size();
+  result.ignored_noise_count = result.ignored_noise_source_indices.size();
+  result.baseline_v3_geometry_obstacle_count =
+      result.baseline_v3_geometry_obstacle_source_indices.size();
+  result.baseline_v3_boundary_warning_count =
+      result.baseline_v3_boundary_warning_source_indices.size();
+  result.baseline_v3_model_assist_count =
+      result.baseline_v3_model_assist_source_indices.size();
+  result.nearest_reportable_core = {};
+  for (const std::size_t source_index : result.reportable_core_source_indices) {
+    const double distance = std::hypot(static_cast<double>(xyz[source_index * 3]),
+                                      xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]);
+    if (distance < result.nearest_reportable_core.distance_from_source_origin_m) {
+      result.nearest_reportable_core.source_index = source_index;
+      result.nearest_reportable_core.distance_from_source_origin_m = distance;
+    }
+  }
 }
 
 Point3f RailPairCentre(const RailPair& pair) {
@@ -461,39 +556,12 @@ ArcLimitedExtensionResult ExtendRailPairsForwardArcClamped(
 
 std::array<double, 8> CandidateBaselineV2Features(
     const float* xyz, const std::vector<std::size_t>& component) {
-  double min_x = std::numeric_limits<double>::infinity();
-  double min_y = std::numeric_limits<double>::infinity();
-  double min_z = std::numeric_limits<double>::infinity();
-  double max_x = -std::numeric_limits<double>::infinity();
-  double max_y = -std::numeric_limits<double>::infinity();
-  double max_z = -std::numeric_limits<double>::infinity();
-  double sum_x = 0.0;
-  double sum_y = 0.0;
-  double sum_z = 0.0;
-  double nearest_distance_m = std::numeric_limits<double>::infinity();
-  for (const std::size_t source_index : component) {
-    const Point3f point{xyz[source_index * 3], xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]};
-    if (!IsFinite(point)) throw std::invalid_argument("xyz must be finite");
-    min_x = std::min(min_x, static_cast<double>(point.x));
-    min_y = std::min(min_y, static_cast<double>(point.y));
-    min_z = std::min(min_z, static_cast<double>(point.z));
-    max_x = std::max(max_x, static_cast<double>(point.x));
-    max_y = std::max(max_y, static_cast<double>(point.y));
-    max_z = std::max(max_z, static_cast<double>(point.z));
-    sum_x += point.x;
-    sum_y += point.y;
-    sum_z += point.z;
-    nearest_distance_m = std::min(nearest_distance_m, std::hypot(
-        static_cast<double>(point.x), point.y, point.z));
-  }
-  const double point_count = static_cast<double>(component.size());
-  const double extent_x = max_x - min_x;
-  const double extent_y = max_y - min_y;
-  const double extent_z = max_z - min_z;
+  const auto stats = ComputeComponentShapeStats(xyz, component);
+  const double point_count = static_cast<double>(stats.point_count);
+  const double extent_x = stats.max_x - stats.min_x;
+  const double extent_y = stats.max_y - stats.min_y;
+  const double extent_z = stats.max_z - stats.min_z;
   const double volume = std::max(extent_x * extent_y * extent_z, 1e-6);
-  const double centroid_x = sum_x / point_count;
-  const double centroid_y = sum_y / point_count;
-  const double centroid_z = sum_z / point_count;
   return {
       point_count,
       extent_x,
@@ -501,8 +569,8 @@ std::array<double, 8> CandidateBaselineV2Features(
       extent_z,
       volume,
       point_count / volume,
-      std::hypot(centroid_x, centroid_y, centroid_z),
-      nearest_distance_m,
+      std::hypot(stats.centroid_x, stats.centroid_y, stats.centroid_z),
+      stats.nearest_distance_m,
   };
 }
 
@@ -569,11 +637,7 @@ void ApplyCoreNoiseFilter(const float* xyz, std::size_t point_count,
   if (result.labels.size() != point_count)
     throw std::invalid_argument("labels must match point count");
   if (!config.enabled) {
-    result.reportable_core_count = 0;
-    result.ignored_noise_count = 0;
-    result.reportable_core_source_indices.clear();
-    result.ignored_noise_source_indices.clear();
-    result.nearest_reportable_core = {};
+    ResetReportableOutputs(result);
     return;
   }
   if (config.min_reportable_core_points == 0 || !std::isfinite(config.connectivity_radius_m) ||
@@ -582,11 +646,7 @@ void ApplyCoreNoiseFilter(const float* xyz, std::size_t point_count,
       !std::isfinite(config.max_average_axis_distance_m) || config.max_average_axis_distance_m <= 0.0)
     throw std::invalid_argument("invalid core noise filter config");
 
-  result.reportable_core_count = 0;
-  result.ignored_noise_count = 0;
-  result.reportable_core_source_indices.clear();
-  result.ignored_noise_source_indices.clear();
-  result.nearest_reportable_core = {};
+  ResetReportableOutputs(result);
 
   std::vector<std::size_t> core_indices;
   core_indices.reserve(result.core_count);
@@ -636,18 +696,7 @@ void ApplyCoreNoiseFilter(const float* xyz, std::size_t point_count,
     target.insert(target.end(), component.begin(), component.end());
   }
 
-  std::sort(result.reportable_core_source_indices.begin(), result.reportable_core_source_indices.end());
-  std::sort(result.ignored_noise_source_indices.begin(), result.ignored_noise_source_indices.end());
-  result.reportable_core_count = result.reportable_core_source_indices.size();
-  result.ignored_noise_count = result.ignored_noise_source_indices.size();
-  for (const std::size_t source_index : result.reportable_core_source_indices) {
-    const double distance = std::hypot(static_cast<double>(xyz[source_index * 3]),
-                                      xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]);
-    if (distance < result.nearest_reportable_core.distance_from_source_origin_m) {
-      result.nearest_reportable_core.source_index = source_index;
-      result.nearest_reportable_core.distance_from_source_origin_m = distance;
-    }
-  }
+  FinalizeReportableOutputs(xyz, result);
 }
 
 void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
@@ -662,11 +711,7 @@ void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
   if (profile) *profile = {};
   const auto profile_started = std::chrono::steady_clock::now();
 
-  result.reportable_core_count = 0;
-  result.ignored_noise_count = 0;
-  result.reportable_core_source_indices.clear();
-  result.ignored_noise_source_indices.clear();
-  result.nearest_reportable_core = {};
+  ResetReportableOutputs(result);
 
   std::vector<std::size_t> core_indices;
   core_indices.reserve(result.core_count);
@@ -748,18 +793,136 @@ void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
     profile->tree_decision_ms = tree_decision_ms;
   }
 
-  std::sort(result.reportable_core_source_indices.begin(), result.reportable_core_source_indices.end());
-  std::sort(result.ignored_noise_source_indices.begin(), result.ignored_noise_source_indices.end());
-  result.reportable_core_count = result.reportable_core_source_indices.size();
-  result.ignored_noise_count = result.ignored_noise_source_indices.size();
-  for (const std::size_t source_index : result.reportable_core_source_indices) {
-    const double distance = std::hypot(static_cast<double>(xyz[source_index * 3]),
-                                      xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]);
-    if (distance < result.nearest_reportable_core.distance_from_source_origin_m) {
-      result.nearest_reportable_core.source_index = source_index;
-      result.nearest_reportable_core.distance_from_source_origin_m = distance;
+  FinalizeReportableOutputs(xyz, result);
+  if (profile) {
+    profile->output_finalize_ms = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - connected_components_finished).count();
+  }
+}
+
+void ApplyBaselineV3(const float* xyz, std::size_t point_count,
+                     AnalysisResult& result,
+                     double connectivity_radius_m,
+                     FrozenNoiseTreeV1Profile* profile) {
+  if (!xyz) throw std::invalid_argument("xyz must not be null");
+  if (result.labels.size() != point_count)
+    throw std::invalid_argument("labels must match point count");
+  if (!std::isfinite(connectivity_radius_m) || connectivity_radius_m <= 0.0)
+    throw std::invalid_argument("invalid baseline_v3 connectivity radius");
+  if (profile) *profile = {};
+  const auto profile_started = std::chrono::steady_clock::now();
+
+  ResetReportableOutputs(result);
+
+  std::vector<std::size_t> core_indices;
+  core_indices.reserve(result.core_count);
+  for (std::size_t index = 0; index < result.labels.size(); ++index)
+    if (result.labels[index] == Zone::kCore) core_indices.push_back(index);
+  const auto core_index_extracted = std::chrono::steady_clock::now();
+  if (profile) {
+    profile->core_index_count = core_indices.size();
+    profile->core_index_extract_ms = std::chrono::duration<double, std::milli>(
+        core_index_extracted - profile_started).count();
+  }
+
+  constexpr std::size_t kStrongGeometryMinPoints = 1000;
+  constexpr std::size_t kBoundaryWarningMinPoints = 250;
+  const double radius2 = connectivity_radius_m * connectivity_radius_m;
+  const auto spatial_index = BuildSpatialIndex(xyz, core_indices, connectivity_radius_m);
+  std::vector<bool> visited(core_indices.size(), false);
+  std::vector<std::size_t> stack;
+  std::vector<std::size_t> component;
+  const auto connected_components_started = core_index_extracted;
+  double tree_decision_ms = 0.0;
+  for (std::size_t seed = 0; seed < core_indices.size(); ++seed) {
+    if (visited[seed]) continue;
+    visited[seed] = true;
+    stack.assign(1, seed);
+    component.clear();
+    while (!stack.empty()) {
+      const std::size_t local = stack.back();
+      stack.pop_back();
+      const std::size_t source_index = core_indices[local];
+      component.push_back(source_index);
+      const Point3f point{xyz[source_index * 3], xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]};
+      if (!IsFinite(point)) throw std::invalid_argument("xyz must be finite");
+      const SpatialCell cell = PointCell(point, connectivity_radius_m);
+      for (int dz_cell = -1; dz_cell <= 1; ++dz_cell) {
+        for (int dy_cell = -1; dy_cell <= 1; ++dy_cell) {
+          for (int dx_cell = -1; dx_cell <= 1; ++dx_cell) {
+            const auto nearby = spatial_index.find({
+                cell.x + dx_cell, cell.y + dy_cell, cell.z + dz_cell});
+            if (nearby == spatial_index.end()) continue;
+            for (const std::size_t other : nearby->second) {
+              if (visited[other]) continue;
+              if (profile) ++profile->neighbor_distance_checks;
+              const std::size_t other_source_index = core_indices[other];
+              const Point3f candidate{xyz[other_source_index * 3], xyz[other_source_index * 3 + 1],
+                                      xyz[other_source_index * 3 + 2]};
+              const double dx = static_cast<double>(point.x) - candidate.x;
+              const double dy = static_cast<double>(point.y) - candidate.y;
+              const double dz = static_cast<double>(point.z) - candidate.z;
+              if (dx * dx + dy * dy + dz * dz > radius2) continue;
+              visited[other] = true;
+              stack.push_back(other);
+            }
+          }
+        }
+      }
+    }
+
+    const auto shape = ComputeComponentShapeStats(xyz, component);
+    const bool boundary_warning =
+        component.size() >= kBoundaryWarningMinPoints && BaselineV3BoundaryWarning(shape);
+    bool model_obstacle = false;
+    if (!boundary_warning &&
+        component.size() < kStrongGeometryMinPoints) {
+      const auto tree_decision_started = std::chrono::steady_clock::now();
+      const auto features = CandidateBaselineV2Features(xyz, component);
+      model_obstacle = CandidateBaselineV2Score(features) >= kCandidateBaselineV2Threshold;
+      const auto tree_decision_finished = std::chrono::steady_clock::now();
+      tree_decision_ms += std::chrono::duration<double, std::milli>(
+          tree_decision_finished - tree_decision_started).count();
+    }
+    if (profile) {
+      ++profile->component_count;
+      if ((component.size() >= kStrongGeometryMinPoints && !boundary_warning) || model_obstacle)
+        ++profile->model_obstacle_component_count;
+      else
+        ++profile->model_noise_component_count;
+    }
+
+    if (boundary_warning) {
+      result.baseline_v3_boundary_warning_source_indices.insert(
+          result.baseline_v3_boundary_warning_source_indices.end(),
+          component.begin(), component.end());
+      result.ignored_noise_source_indices.insert(
+          result.ignored_noise_source_indices.end(), component.begin(), component.end());
+    } else if (component.size() >= kStrongGeometryMinPoints) {
+      result.baseline_v3_geometry_obstacle_source_indices.insert(
+          result.baseline_v3_geometry_obstacle_source_indices.end(),
+          component.begin(), component.end());
+      result.reportable_core_source_indices.insert(
+          result.reportable_core_source_indices.end(), component.begin(), component.end());
+    } else if (model_obstacle) {
+      result.baseline_v3_model_assist_source_indices.insert(
+          result.baseline_v3_model_assist_source_indices.end(),
+          component.begin(), component.end());
+      result.reportable_core_source_indices.insert(
+          result.reportable_core_source_indices.end(), component.begin(), component.end());
+    } else {
+      result.ignored_noise_source_indices.insert(
+          result.ignored_noise_source_indices.end(), component.begin(), component.end());
     }
   }
+  const auto connected_components_finished = std::chrono::steady_clock::now();
+  if (profile) {
+    profile->connected_components_and_features_ms =
+        std::chrono::duration<double, std::milli>(
+            connected_components_finished - connected_components_started).count() - tree_decision_ms;
+    profile->tree_decision_ms = tree_decision_ms;
+  }
+  FinalizeReportableOutputs(xyz, result);
   if (profile) {
     profile->output_finalize_ms = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - connected_components_finished).count();

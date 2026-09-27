@@ -7,6 +7,7 @@
 #include <vector>
 
 using lidar_mosmetro3d::AnalyzeCurveEnvelope;
+using lidar_mosmetro3d::ApplyBaselineV3;
 using lidar_mosmetro3d::ApplyCandidateBaselineV2;
 using lidar_mosmetro3d::Bounds;
 using lidar_mosmetro3d::BuildCurveEnvelopeWireframe;
@@ -92,6 +93,51 @@ int main() {
   assert(model_profile.model_obstacle_component_count == 1);
   assert(model_profile.model_noise_component_count == 1);
   assert(model_profile.neighbor_distance_checks < 2000);
+
+  std::vector<float> baseline_v3_points;
+  for (int ix = 0; ix < 10; ++ix) {
+    for (int iy = 0; iy < 10; ++iy) {
+      for (int iz = 0; iz < 10; ++iz) {
+        baseline_v3_points.insert(baseline_v3_points.end(), {
+            static_cast<float>(-0.2 + ix * 0.05),
+            static_cast<float>(-5.2 + iy * 0.05),
+            static_cast<float>(0.2 + iz * 0.05)});
+      }
+    }
+  }
+  const std::size_t strong_count = baseline_v3_points.size() / 3;
+  for (int ix = 0; ix < 2; ++ix) {
+    for (int iy = 0; iy < 5; ++iy) {
+      for (int iz = 0; iz < 100; ++iz) {
+        baseline_v3_points.insert(baseline_v3_points.end(), {
+            static_cast<float>(-1.38 + ix * 0.04),
+            static_cast<float>(-5.2 + iy * 0.02),
+            static_cast<float>(0.1 + iz * 0.016)});
+      }
+    }
+  }
+  lidar_mosmetro3d::AnalysisResult baseline_v3_input;
+  baseline_v3_input.labels.assign(baseline_v3_points.size() / 3, Zone::kCore);
+  baseline_v3_input.core_count = baseline_v3_input.labels.size();
+  ApplyBaselineV3(
+      baseline_v3_points.data(), baseline_v3_points.size() / 3, baseline_v3_input, 0.25);
+  assert(baseline_v3_input.baseline_v3_geometry_obstacle_count == strong_count);
+  assert(baseline_v3_input.baseline_v3_boundary_warning_count ==
+         baseline_v3_input.core_count - strong_count);
+  assert(baseline_v3_input.reportable_core_count == strong_count);
+  assert(baseline_v3_input.ignored_noise_count == baseline_v3_input.core_count - strong_count);
+  assert(baseline_v3_input.baseline_v3_geometry_obstacle_source_indices.front() == 0);
+  assert(baseline_v3_input.baseline_v3_boundary_warning_source_indices.front() == strong_count);
+
+  lidar_mosmetro3d::AnalysisResult baseline_v3_model_input;
+  baseline_v3_model_input.labels.assign(model_chain.size() / 3, Zone::kCore);
+  baseline_v3_model_input.core_count = baseline_v3_model_input.labels.size();
+  ApplyBaselineV3(
+      model_chain.data(), model_chain.size() / 3, baseline_v3_model_input, 0.25);
+  assert(baseline_v3_model_input.baseline_v3_model_assist_count == 150);
+  assert(baseline_v3_model_input.baseline_v3_geometry_obstacle_count == 0);
+  assert(baseline_v3_model_input.baseline_v3_boundary_warning_count == 0);
+  assert(baseline_v3_model_input.reportable_core_count == 150);
 
   const auto extended_pairs = ExtendRailPairsForward(pairs, 10.0);
   assert(extended_pairs.size() == pairs.size() + 1);

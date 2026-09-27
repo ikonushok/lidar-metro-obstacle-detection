@@ -36,9 +36,10 @@ class CpuCatalogRuntimeSourceFrameTest(unittest.TestCase):
         cli = (root / 'src' / 'cpp' / 'curve_pipeline_stream_cli.cpp').read_text(encoding='utf-8')
         self.assertIn("result.get('noise_filter_mode', 'legacy') != self.noise_filter_mode", runtime)
         self.assertIn('bool use_model_filter', cli)
+        self.assertIn('bool use_baseline_v3_filter', cli)
         self.assertIn('noise_filter_mode', cli)
-        self.assertIn('use_model_filter ? "candidate_baseline_v2" : "legacy"', cli)
-        self.assertIn('lean_benchmark, active_model_filter', cli)
+        self.assertIn('active_noise_filter_mode', cli)
+        self.assertIn('lean_benchmark, active_noise_filter_mode', cli)
 
     def test_direct_cpp_timing_uses_one_active_filter_by_default(self):
         root = Path(__file__).resolve().parents[1]
@@ -46,21 +47,34 @@ class CpuCatalogRuntimeSourceFrameTest(unittest.TestCase):
         evaluator = (root / 'scripts' / 'evaluate_noise_classifier.py').read_text(encoding='utf-8')
         self.assertIn('--compare-noise-filters', cli)
         self.assertIn('"--compare-noise-filters"', evaluator)
-        self.assertIn('if (!active_model_filter || compare_noise_filters)', cli)
+        self.assertIn('if ((!active_model_filter && !active_baseline_v3_filter) || compare_noise_filters)', cli)
         self.assertIn('if (active_model_filter || compare_noise_filters)', cli)
         self.assertNotIn('common_elapsed + legacy_filter_ms', cli)
         self.assertNotIn('common_elapsed + model_filter_ms', cli)
         self.assertIn('common_processing_ms + legacy_filter_ms + wireframe_ms', cli)
         self.assertIn('common_processing_ms + model_filter_ms + wireframe_ms', cli)
 
-    def test_model_update_plan_keeps_direct_path_and_same_data_speed_comparison(self):
+    def test_baseline_v3_is_the_default_direct_and_ros2_runtime_mode(self):
         root = Path(__file__).resolve().parents[1]
-        doc = (root / 'docs' / 'README_noise_classifier.md').read_text(encoding='utf-8')
-        self.assertIn('runtime_transport=direct_cpp', doc)
-        self.assertIn('ROS2-узел остаётся отдельным адаптером', doc)
-        self.assertIn('После обучения сравнить текущую и новую модель на одинаковых кадрах', doc)
-        self.assertIn('способе вызова', doc)
-        self.assertIn('не утверждать, что новая модель не замедляет плеер', doc)
+        runtime = (root / 'scripts' / 'cpu_catalog_runtime.py').read_text(encoding='utf-8')
+        node = (root / 'src' / 'lidar_mosmetro3d_cpp' / 'src' /
+                'curve_envelope_node.cpp').read_text(encoding='utf-8')
+        launcher = (root / 'scripts' / 'run_stage_2_cpu_player.ps1').read_text(encoding='utf-8')
+        self.assertIn("noise_filter_mode='baseline_v3'", runtime)
+        self.assertIn('declare_parameter<std::string>("noise_filter_mode", "baseline_v3")', node)
+        self.assertIn("[string]$NoiseFilterMode = 'baseline_v3'", launcher)
+        self.assertIn("'candidate_baseline_v2', 'baseline_v3'", runtime)
+
+    def test_direct_baseline_v3_unknown_resets_temporal_state(self):
+        root = Path(__file__).resolve().parents[1]
+        cli = (root / 'src' / 'cpp' /
+               'curve_pipeline_stream_cli.cpp').read_text(encoding='utf-8')
+        unknown_branch = cli[
+            cli.index('if (rails.rail_pairs.size() < 2) {'):
+            cli.index('continue;', cli.index('if (rails.rail_pairs.size() < 2) {'))
+        ]
+        self.assertIn('previous_baseline_v3_model_alarm = false;', unknown_branch)
+        self.assertIn('baseline_v3_model_consecutive_alarm_frames = 0;', unknown_branch)
 
     def test_runtime_waits_for_bidirectional_discovery_before_large_cloud_publish(self):
         source = (Path(__file__).resolve().parents[1] / 'scripts' / 'cpu_catalog_runtime.py').read_text(encoding='utf-8')

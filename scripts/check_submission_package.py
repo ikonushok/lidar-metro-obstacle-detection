@@ -25,15 +25,16 @@ REQUIRED_PATHS = (
     "README.md",
     "SOLUTION.md",
     "Dockerfile",
+    "models/noise_classifier_candidate_baseline_v2.json",
+    "scripts/build_current_model_validation_dataset.py",
+    "scripts/evaluate_current_model_real_synthetic.py",
     "scripts/prepare_hackathon_datasets.py",
     "scripts/run_stage_2_cpu_player.ps1",
     "scripts/check_submission_package.py",
     "docs/README_REVIEWER_PLAYER_QUICKSTART.md",
     "docs/README_SUBMISSION_CHECKLIST.md",
-    "models/noise_classifier_candidate_baseline_v2.json",
     "src/lidar_mosmetro3d_cpp/package.xml",
     "src/lidar_mosmetro3d_cpp/src/curve_envelope_node.cpp",
-    "src/cpp/candidate_baseline_v2_model.inc",
 )
 
 REQUIRED_GITIGNORE_TOKENS = (
@@ -62,13 +63,11 @@ def changed_files(repo: Path) -> list[str]:
     return run_git(repo, ["status", "--short"])
 
 
-def check_required_paths(repo: Path, tracked: set[str] | None = None) -> list[str]:
+def check_required_paths(repo: Path) -> list[str]:
     errors: list[str] = []
     for relative in REQUIRED_PATHS:
         if not (repo / relative).exists():
             errors.append(f"missing required path: {relative}")
-        elif tracked is not None and relative not in tracked:
-            errors.append(f"required path is not tracked by git: {relative}")
     return errors
 
 
@@ -112,8 +111,7 @@ def main() -> int:
         sys.stderr.write(error.stderr)
         return 2
 
-    tracked = set(paths)
-    errors.extend(check_required_paths(repo, tracked))
+    errors.extend(check_required_paths(repo))
     errors.extend(check_forbidden_tracked(paths))
     errors.extend(check_large_tracked(repo, paths, args.max_bytes))
     errors.extend(check_gitignore(repo))

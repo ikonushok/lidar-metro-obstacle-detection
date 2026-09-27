@@ -3,6 +3,11 @@
 Этот документ фиксирует порядок подготовки публичного репозитория и материалов
 перед отправкой ссылки в личный кабинет. Данные `dataset/` в Git не добавляются.
 
+Перед финальной сдачей явно фиксируется, что сдаётся `baseline_v3 runtime
+pipeline`: geometry-first gate, boundary warning и temporal model-assist только
+для слабых/неочевидных случаев. `candidate_baseline_v2` не называть финальной
+моделью; он остаётся встроенным score assist-ветки и сравнительным фильтром.
+
 ## 1. Репозиторий
 
 - Репозиторий содержит исходники, Dockerfile, конфиги, тесты и документацию.
@@ -41,7 +46,7 @@ python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
 
 ## 3. Прототип / плеер
 
-Минимальная демонстрация для проверяющего:
+Минимальная демонстрация текущего исполняемого `baseline_v3` runtime:
 
 ```powershell
 .\scripts\run_stage_2_cpu_player.ps1 `
@@ -49,7 +54,7 @@ python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
   -RailSelectionMethod development_candidate `
   -RailForwardMinM 2 `
   -ForwardExtensionMethod tangent `
-  -NoiseFilterMode candidate_baseline_v2 `
+  -NoiseFilterMode baseline_v3 `
   -RebuildImage
 ```
 
@@ -100,4 +105,3 @@ ros2 bag play -> curve_envelope_node -> /stage_3/curve_envelope_candidate
 
 После дедлайна нельзя менять сданную ветку, презентацию, документы и прототип
 по отправленным ссылкам.
-

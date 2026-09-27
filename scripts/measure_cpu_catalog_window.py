@@ -26,8 +26,8 @@ def main():
     parser.add_argument('--min-arc-radius-m', type=float, default=60.0)
     parser.add_argument('--max-arc-turn-deg', type=float, default=8.0)
     parser.add_argument('--arc-fit-window-pairs', type=int, default=5)
-    parser.add_argument('--noise-filter-mode', choices=('legacy', 'candidate_baseline_v2'),
-                        default='candidate_baseline_v2')
+    parser.add_argument('--noise-filter-mode', choices=('legacy', 'candidate_baseline_v2', 'baseline_v3'),
+                        default='baseline_v3')
     args = parser.parse_args()
     if args.first_index < 0 or args.last_index < args.first_index:
         raise ValueError('invalid contiguous window')

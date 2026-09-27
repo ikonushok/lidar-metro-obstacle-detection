@@ -29,7 +29,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     const auto output = declare_parameter<std::string>("output_topic", "/stage_3/curve_envelope_candidate");
     source_frame_ = declare_parameter<std::string>("source_frame", "hesai_lidar");
     compute_backend_ = declare_parameter<std::string>("compute_backend", "cpu");
-    noise_filter_mode_ = declare_parameter<std::string>("noise_filter_mode", "candidate_baseline_v2");
+    noise_filter_mode_ = declare_parameter<std::string>("noise_filter_mode", "baseline_v3");
     temporal_confirmation_enabled_ = declare_parameter<bool>("temporal_confirmation_enabled", true);
     temporal_required_consecutive_frames_ = declare_parameter<int>("temporal_required_consecutive_frames", 2);
     if (temporal_required_consecutive_frames_ <= 0) {
@@ -169,11 +169,14 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       const std::string& header_timestamp_ns) {
     TemporalDecision decision;
     decision.frame_intrusion_candidate_present = frame_intrusion_candidate_present;
-    const bool active = noise_filter_mode_ == "candidate_baseline_v2" && temporal_confirmation_enabled_;
+    const bool active = (noise_filter_mode_ == "candidate_baseline_v2" ||
+                         noise_filter_mode_ == "baseline_v3") &&
+                        temporal_confirmation_enabled_;
     if (!active || temporal_required_consecutive_frames_ <= 1) {
       decision.confirmed_intrusion_candidate_present = frame_intrusion_candidate_present;
       decision.consecutive_alarm_frames = frame_intrusion_candidate_present ? 1 : 0;
-      decision.status = noise_filter_mode_ == "candidate_baseline_v2"
+      decision.status = (noise_filter_mode_ == "candidate_baseline_v2" ||
+                         noise_filter_mode_ == "baseline_v3")
           ? (temporal_confirmation_enabled_ ? "BYPASS_REQUIRED_FRAMES_1" : "DISABLED")
           : "NOT_APPLIED_LEGACY_MODE";
       return decision;
@@ -277,7 +280,8 @@ class CurveEnvelopeNode final : public rclcpp::Node {
            expanded_.bottom <= core_.bottom && expanded_.top >= core_.top)) return PublishUnknown("INVALID_ENVELOPE", cloud, xyz.size() / 3);
     if (compute_backend_ != "auto" && compute_backend_ != "cpu" && compute_backend_ != "cuda")
       return PublishUnknown("INVALID_COMPUTE_BACKEND", cloud, xyz.size() / 3);
-    if (noise_filter_mode_ != "legacy" && noise_filter_mode_ != "candidate_baseline_v2")
+    if (noise_filter_mode_ != "legacy" && noise_filter_mode_ != "candidate_baseline_v2" &&
+        noise_filter_mode_ != "baseline_v3")
       return PublishUnknown("INVALID_NOISE_FILTER_MODE", cloud, xyz.size() / 3);
     lidar_mosmetro3d::RailSelectionMethod selection;
     if (rail_selection_method_ == "baseline") selection = lidar_mosmetro3d::RailSelectionMethod::kBaseline;
@@ -364,23 +368,45 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     if (noise_filter_mode_ == "candidate_baseline_v2") {
       lidar_mosmetro3d::ApplyCandidateBaselineV2(
           xyz.data(), xyz.size() / 3, result, noise_config_.connectivity_radius_m);
+    } else if (noise_filter_mode_ == "baseline_v3") {
+      lidar_mosmetro3d::ApplyBaselineV3(
+          xyz.data(), xyz.size() / 3, result, noise_config_.connectivity_radius_m);
     }
     const auto core_wireframe = lidar_mosmetro3d::BuildCurveEnvelopeWireframe(envelope_pairs, core_);
     const auto expanded_wireframe = lidar_mosmetro3d::BuildCurveEnvelopeWireframe(envelope_pairs, expanded_);
     const auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     const bool raw_core_return_present = result.core_count > 0;
-    const bool frame_intrusion_candidate_present = result.reportable_core_count > 0;
+    const bool baseline_v3_mode = noise_filter_mode_ == "baseline_v3";
+    const bool baseline_v3_geometry_intrusion =
+        baseline_v3_mode && result.baseline_v3_geometry_obstacle_count > 0;
+    const bool baseline_v3_model_frame_intrusion =
+        baseline_v3_mode && result.baseline_v3_model_assist_count > 0;
+    const bool baseline_v3_boundary_warning =
+        baseline_v3_mode && result.baseline_v3_boundary_warning_count > 0;
+    const bool frame_intrusion_candidate_present = baseline_v3_mode
+        ? baseline_v3_model_frame_intrusion
+        : result.reportable_core_count > 0;
     const auto header_timestamp_ns = HeaderTimestampNs(cloud);
     const auto temporal_decision = ApplyTemporalConfirmation(
         frame_intrusion_candidate_present, header_timestamp_ns);
-    const bool intrusion_candidate_present =
+    const bool intrusion_candidate_present = baseline_v3_mode
+        ? (baseline_v3_geometry_intrusion ||
+           temporal_decision.confirmed_intrusion_candidate_present)
+        : temporal_decision.confirmed_intrusion_candidate_present;
+    const bool model_temporal_confirmed_intrusion_candidate_present =
         temporal_decision.confirmed_intrusion_candidate_present;
     const bool margin_return_present = result.margin_count > 0;
     const char* status = intrusion_candidate_present ? "OBSERVED_CORE_INTRUSION_CANDIDATE"
+                         : baseline_v3_boundary_warning ? "OBSERVED_BOUNDARY_WARNING"
+                         : baseline_v3_mode && raw_core_return_present ? "UNKNOWN"
                          : frame_intrusion_candidate_present ? "UNCONFIRMED_CORE_INTRUSION_CANDIDATE"
                          : raw_core_return_present ? "NO_REPORTABLE_INTRUSION_NOISE_IGNORED"
                          : margin_return_present ? "OBSERVED_MARGIN_RETURN" : "UNKNOWN";
-    const char* reason = intrusion_candidate_present ? "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
+    const char* reason = intrusion_candidate_present && baseline_v3_mode ? "BASELINE_V3_CONFIRMED_INTRUSION_CANDIDATE"
+                         : intrusion_candidate_present ? "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
+                         : baseline_v3_boundary_warning ? "BASELINE_V3_BOUNDARY_WARNING_NOT_OBSTACLE"
+                         : baseline_v3_mode && frame_intrusion_candidate_present ? "BASELINE_V3_MODEL_ASSIST_WAITING_FOR_TEMPORAL_CONFIRMATION"
+                         : baseline_v3_mode && raw_core_return_present ? "BASELINE_V3_WEAK_OR_UNCONFIRMED_CORE_UNKNOWN_NOT_CLEAR"
                          : frame_intrusion_candidate_present ? "MODEL_CANDIDATE_WAITING_FOR_TEMPORAL_CONFIRMATION"
                          : raw_core_return_present ? "ONLY_SPARSE_CORE_GROUPS"
                          : margin_return_present ? "OBSERVED_RETURN_IN_CLEARANCE_MARGIN"
@@ -398,14 +424,15 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         << ",\"model_frame_intrusion_candidate_present\":"
         << (frame_intrusion_candidate_present ? "true" : "false")
         << ",\"model_temporal_confirmed_intrusion_candidate_present\":"
-        << (intrusion_candidate_present ? "true" : "false")
+        << (model_temporal_confirmed_intrusion_candidate_present ? "true" : "false")
         << ",\"model_temporal_consecutive_alarm_frames\":"
         << temporal_decision.consecutive_alarm_frames
         << ",\"raw_core_return_present\":" << (raw_core_return_present ? "true" : "false")
         << ",\"all_core_returns_are_intrusion_candidates\":false,\"margin_return_present\":" << (margin_return_present ? "true" : "false")
          << ",\"compute_backend_requested\":\"" << BackendRequestName() << "\",\"compute_backend_used\":\"" << backend_used << "\","
          << "\"runtime_transport\":\"ros2\",\"noise_filter_mode\":\"" << noise_filter_mode_ << "\","
-         << "\"noise_filter_name\":\"" << (noise_filter_mode_ == "candidate_baseline_v2" ? "candidate_baseline_v2" : "legacy_geometry") << "\","
+         << "\"noise_filter_name\":\"" << (noise_filter_mode_ == "candidate_baseline_v2" ? "candidate_baseline_v2" :
+                                           noise_filter_mode_ == "baseline_v3" ? "baseline_v3" : "legacy_geometry") << "\","
          << "\"rail_selection_method\":\"" << lidar_mosmetro3d::RailSelectionMethodName(selection) << "\","
          << "\"rail_search_config\":{\"forward_min_m\":" << rail_config_.forward_min
          << ",\"forward_max_m\":" << rail_config_.forward_max
@@ -414,6 +441,15 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         << "\"rail_pair_count\":" << envelope_pairs.size() << ",\"core_count\":" << result.core_count
         << ",\"reportable_core_count\":" << result.reportable_core_count
         << ",\"ignored_noise_count\":" << result.ignored_noise_count
+        << ",\"baseline_v3_geometry_obstacle_count\":" << result.baseline_v3_geometry_obstacle_count
+        << ",\"baseline_v3_boundary_warning_count\":" << result.baseline_v3_boundary_warning_count
+        << ",\"baseline_v3_model_assist_count\":" << result.baseline_v3_model_assist_count
+        << ",\"baseline_v3_geometry_intrusion_candidate_present\":"
+        << (baseline_v3_geometry_intrusion ? "true" : "false")
+        << ",\"baseline_v3_boundary_warning_present\":"
+        << (baseline_v3_boundary_warning ? "true" : "false")
+        << ",\"baseline_v3_model_assist_frame_candidate_present\":"
+        << (baseline_v3_model_frame_intrusion ? "true" : "false")
         << ",\"margin_count\":" << result.margin_count << ",\"outside_reference_count\":" << result.outside_reference_count
         << ",\"unknown_count\":" << result.unknown_count << ",\"processing_ms\":" << elapsed;
     const char* geometry_basis = !forward_extrapolated ? "ASSUMED_CURVE_RAIL_AXIS_FROM_SOURCE_XYZ"

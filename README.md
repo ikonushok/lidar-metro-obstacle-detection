@@ -4,7 +4,9 @@
 
 # lidar-metro-obstacle-detection
 
-Экспериментальный модуль обнаружения препятствий в габарите движения поезда метро по облакам 3D-лидара. Текущее решение ищет рельсы, строит габарит с продолжением `tangent` и применяет обученную `candidate_baseline_v2` к компонентам внутри него: «препятствие / шум».
+Экспериментальный модуль обнаружения препятствий в габарите движения поезда метро по облакам 3D-лидара.
+
+Актуальная версия для дальнейшей/финальной сдачи — **`baseline_v3` runtime pipeline**. Это не одна ML-модель, а составная C++/ROS2-логика: geometry-first gate по габариту, boundary/warning для внешних или верхних объектов и temporal model-assist только для слабых/неочевидных случаев. Если temporal-ветка не подтверждает такой случай, результат остаётся `UNKNOWN`, не `CLEAR`.
 
 Два способа запуска используют общее C++ ядро:
 
@@ -13,21 +15,26 @@
 | Исследование записей | Архив bag → XYZ → прямой C++ → JSON → HTTP-плеер | Да, для просмотра |
 | Проверка заказчиком / сдача | ROS2 PointCloud2 → C++ node → ROS2 String с JSON | Нет |
 
-Интеграционные проверки покрывают direct player и headless ROS2 replay на локально подготовленных данных. Это ограниченные проверки интерфейсов, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
+Интеграционные проверки сохранены в [отчёте direct player](docs/stages/stage_5/stage_5_direct_player_run.md). Это ограниченные проверки интерфейсов, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
 
 Среда сдачи по [ТЗ](docs/hackathon_documentations/5.%20ДепТранспорта.pdf): **Ubuntu 22.04 + ROS 2 Humble + Docker**. Проект подготовлен для [«Лидеров цифровой трансформации»](https://i.moscow/cabinet/hackaton/lct/contest/1233bb5506bc455f86d534b3b40171f1).
 
-## Как работает текущий алгоритм
+## Как работает актуальный runtime
+
+Актуальный direct/ROS2 путь:
 
 ```text
 PointCloud2 / XYZ
   → проверка входа → поиск наблюдаемых пар рельсов
   → ось и габарит с synthetic tangent-продолжением
-  → raw CORE → связные компоненты → candidate_baseline_v2: препятствие / шум
-  → кандидат, ближайшее расстояние и диагностика
+  → geometry-first gate:
+      явно внутри габарита → obstacle
+      явно вне/выше габарита → boundary/warning, не obstacle
+      слабый/маленький/неочевидный случай → temporal model-assist
+  → если temporal model-assist не подтвердил → UNKNOWN
 ```
 
-Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Модель — forest-lite классификатор, встроенный в C++; [метод и ограничения](docs/README_noise_classifier.md).
+Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Внутри assist-ветки сейчас используется переносимый `candidate_baseline_v2` score, но финальным сдачным решением является весь `baseline_v3` pipeline; [короткие метрики](docs/README_noise_classifier.md), [сводка baseline_v3](docs/README_noise_classifier_v3.md).
 
 ## Где должны лежать данные
 
@@ -72,12 +79,12 @@ catalog сейчас перечисляет известные источник�
 
 ## C++ CPU player: прямой запуск алгоритма
 
-Текущий режим плеера: `development_candidate`, `RailForwardMinM=2`, `tangent`, `candidate_baseline_v2`.
+Текущий режим плеера: `development_candidate`, `RailForwardMinM=2`, `tangent`, `baseline_v3`.
 
 ```text
 Кадр из bag → XYZ → постоянный C++-процесс через stdin
   → поиск рельсов → габарит tangent → компоненты CORE
-  → candidate_baseline_v2: препятствие / шум → JSON через stdout → плеер
+  → baseline_v3: geometry/boundary/model-assist/UNKNOWN → JSON через stdout → плеер
 ```
 
 Плеер использует `DirectDetailedCpuRuntime`: каждый запрошенный кадр передаётся C++ один раз. В этом режиме не запускаются ROS2-узлы, DDS и цикл повторной публикации PointCloud2. Библиотеки ROS остаются в образе для чтения bag/десериализации сообщений. Первое открытие источника может занимать время из-за извлечения SQLite из архива.
@@ -93,22 +100,27 @@ docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
   -RailSelectionMethod development_candidate `
   -RailForwardMinM 2 `
   -ForwardExtensionMethod tangent `
-  -NoiseFilterMode candidate_baseline_v2 `
+  -NoiseFilterMode baseline_v3 `
   -RebuildImage
 ```
 
-Откройте [http://localhost:8100/](http://localhost:8100/), выберите датасет и нажмите **▶ Запуск**. Плеер получает облако и соответствующий JSON от C++; в режиме `candidate_baseline_v2` использует готовые индексы препятствия/шума и геометрию. `CORE` до модели может содержать инфраструктуру; отрицательный результат модели и `UNKNOWN` не означают подтверждённый свободный путь.
+Откройте [http://localhost:8100/](http://localhost:8100/), выберите датасет и нажмите **▶ Запуск**. Плеер получает облако и соответствующий JSON от C++; в режиме `baseline_v3` использует готовые индексы obstacle/boundary/model-assist/noise и геометрию. `CORE` до фильтра может содержать инфраструктуру; boundary/warning и `UNKNOWN` не означают подтверждённый свободный путь.
+
+Историческая визуальная проверка v2-best из
+[README_noise_classifier_v2.md](docs/README_noise_classifier_v2.md) сохранена
+только как legacy/reference. Для сдачи и smoke-запуска использовать команду
+выше с `-NoiseFilterMode baseline_v3`.
 
 Проверить выбранный режим и один результат:
 
 ```powershell
 $manifest = Invoke-RestMethod 'http://localhost:8100/api/cpu_sources/doubleT_obstacle/manifest.json'
 $manifest | Select-Object runtime_transport, noise_filter_mode, rail_selection_method, rail_search_config, forward_extension_config
-$frame = Invoke-RestMethod 'http://localhost:8100/api/cpu_sources/doubleT_obstacle/13.json' -TimeoutSec 60
+$frame = Invoke-RestMethod 'http://localhost:8100/api/cpu_sources/doubleT_obstacle/14.json' -TimeoutSec 60
 $frame.result | Select-Object intrusion_candidate_present, reportable_core_count, nearest_reportable_intrusion_distance_from_source_origin_m, status, system_status, safety_decision_permitted
 ```
 
-Ожидаются `direct_cpp`, `candidate_baseline_v2`, `development_candidate`, начало поиска `2`, метод `tangent`. Для development-кадра 13 ожидается кандидат; `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняются. Холодное чтение SQLite может увеличить ожидание; тайм-аут HTTP-клиента не останавливает обработку на сервере.
+Ожидаются `direct_cpp`, `baseline_v3`, `development_candidate`, начало поиска `2`, метод `tangent`. Для последовательности `doubleT_obstacle` frame 13 является первым model-assist alarm и ждёт temporal confirmation; frame 14 подтверждается как кандидат. `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняются. Холодное чтение SQLite может увеличить ожидание; тайм-аут HTTP-клиента не останавливает обработку на сервере.
 
 Отдельная проверка совпадения прямого плеера с ROS2-входом:
 
@@ -116,7 +128,7 @@ $frame.result | Select-Object intrusion_candidate_present, reportable_core_count
 .\scripts\validate_ros_model_pipeline.ps1 -Port 8100
 ```
 
-В manifest и JSON плеера должны быть `runtime_transport=direct_cpp`, `noise_filter_mode=candidate_baseline_v2`. Контрольные development-кадры `doubleT_obstacle`: 13 — кандидат препятствия, 145 — шум. Валидатор отдельно запускает ROS2 в тестовом контейнере; самому плееру ROS2-транспорт не нужен. Для проверки нужны сохранённые XYZF и extracted bag `doubleT_obstacle`; это проверка интеграции, не независимого качества модели.
+В manifest и JSON плеера должны быть `runtime_transport=direct_cpp`, `noise_filter_mode=baseline_v3`. Валидатор отдельно запускает ROS2 в тестовом контейнере и сверяет direct/ROS2 на одинаковом входе; самому плееру ROS2-транспорт не нужен. Для проверки нужны сохранённые XYZF и extracted bag `doubleT_obstacle`; это проверка интеграции, не независимого качества модели.
 
 Исторический явный `-RailSelectionMethod baseline` сохраняет ROS2-путь. Опция `-Measure` также отдельно измеряет ROS2-обработку окна; её результаты не являются задержками прямого плеера.
 
@@ -132,13 +144,13 @@ docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
 
 ```text
 ros2 bag play → PointCloud2 → C++ ROS2-узел
-  → те же AutoRails / tangent / компоненты / candidate_baseline_v2
+  → те же AutoRails / tangent / компоненты / baseline_v3
   → ROS2-результат (std_msgs/String с JSON)
 ```
 
-Оба входа используют общее C++-ядро и существующую обученную модель `ApplyCandidateBaselineV2`. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=candidate_baseline_v2`.
+Оба входа используют общее C++-ядро. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=baseline_v3`.
 
-Текущее разделение оставляет плеер средством просмотра, а ROS2 node — сдачным headless-входом для `ros2 bag play`.
+Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. [Спецификация](docs/stages/stage_5/stage_5_direct_player.md) и [результаты проверки](docs/stages/stage_5/stage_5_direct_player_run.md).
 
 ### Пошаговый запуск без плеера
 
@@ -179,7 +191,7 @@ docker run --rm -d --name lidar-detector --shm-size=1g `
   -p rail_selection_method:=development_candidate `
   -p rail_forward_min_m:=2.0 `
   -p forward_extension_method:=tangent `
-  -p noise_filter_mode:=candidate_baseline_v2
+  -p noise_filter_mode:=baseline_v3
 ```
 
 Несмотря на имя образа, HTTP-сервер и плеер этой командой не запускаются. Детектор, bag player и просмотр результата работают в одном контейнере. Для больших облаков используется SHM-профиль образа; 1 GiB shared memory оставляет место для детектора, bag player, `topic echo` и ROS2 daemon. При 512 MiB в этом сценарии наблюдалась ошибка создания SHM-сегмента.
@@ -202,7 +214,7 @@ docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 1.0
 
 При проверке этого сценария на Windows/Docker получен JSON детектора; также наблюдалось предупреждение `Message queue starved` при чтении большого bag с bind mount. Оно означает задержки подачи сообщений: для такого запуска исходный темп не гарантирован. Для оценки производительности на стенде отдельно измеряются чтение, обработка и число полученных результатов.
 
-В окне результата появляются JSON-сообщения: `intrusion_candidate_present`, `nearest_reportable_intrusion_distance_from_source_origin_m`, `status`, `reason`, `source_frame`, `header_timestamp_ns`. `runtime_transport=ros2` и `noise_filter_mode=candidate_baseline_v2` подтверждают выбранный путь. Расстояние отсчитывается от начала координат исходного облака; отсутствие поддержанного результата даёт `UNKNOWN`/`null`, а не доказательство свободного пути. `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняют статус экспериментального candidate-only решения.
+В окне результата появляются JSON-сообщения: `intrusion_candidate_present`, `nearest_reportable_intrusion_distance_from_source_origin_m`, `status`, `reason`, `source_frame`, `header_timestamp_ns`. `runtime_transport=ros2` и `noise_filter_mode=baseline_v3` подтверждают выбранный путь. Расстояние отсчитывается от начала координат исходного облака; отсутствие поддержанного результата даёт `UNKNOWN`/`null`, а не доказательство свободного пути. `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняют статус экспериментального candidate-only решения.
 
 Для другого bag нужно согласовать `input_topic` с `ros2 bag info`, а `source_frame` — с реальным `header.frame_id` PointCloud2. В примере `doubleT_obstacle` топик содержит `hesai128`, но frame равен **`lidar_livox`**; имя топика не определяет систему координат. Подстановка frame сама по себе не подтверждает калибровку или геометрию нового источника.
 
@@ -219,8 +231,8 @@ docker stop lidar-detector
 | Поле / слой | Смысл |
 |---|---|
 | Raw CORE | Все наблюдаемые точки внутри текущего габарита до модели |
-| Reportable / `intrusion_candidate_present` | Компоненты, которые `candidate_baseline_v2` поднимает как сигнал; одиночная CORE-точка не обязательно даёт сигнал |
-| Ignored noise | Компоненты, подавленные моделью; raw CORE остаётся доступен |
+| Reportable / `intrusion_candidate_present` | Компоненты, которые `baseline_v3` поднимает как obstacle: strong geometry или temporal-confirmed model assist |
+| Boundary warning / ignored noise | Внешние/верхние boundary-компоненты и неподтверждённые слабые случаи не становятся `CLEAR`; raw CORE остаётся доступен |
 | `nearest_reportable_intrusion_distance_from_source_origin_m` | Расстояние до ближайшей reportable точки от начала координат исходного облака, не от носа поезда |
 | `system_status=UNKNOWN`, `safety_decision_permitted=false` | Геометрия assumed, разрешение движения не выдаётся; отсутствие кандидата не CLEAR |
 
@@ -228,24 +240,29 @@ docker stop lidar-detector
 
 В текущий запуск не входят CUDA, arc-варианты, deskew, карта, tracking и TTC. `arc_limited` остаётся явным экспериментальным player-режимом; `arc_clamped` доступен только в низкоуровневых C++/ROS2 экспериментах. Их наличие не меняет выбранный `tangent`. Качество и скорость оцениваются раздельно; [результаты измерений](docs/README_noise_classifier.md#время-и-соответствие-тз) указывают версию и область замера. Прямой транспорт не исключает ожидание чтения архива, lock или C++ обработки.
 
-Это хакатонный прототип, не сертифицированная система управления торможением. Он сдаётся как актуальный `candidate_baseline_v2` pipeline с явно указанными ограничениями качества, калибровки и real-time throughput.
+Это хакатонный прототип, не сертифицированная система управления торможением. Для финальной сдачи нужно проверять именно текущую версию `baseline_v3` runtime: чистую сборку, direct/ROS2 parity, длинный replay, задержки/очереди/drops и ресурсы. [План работ и задачи перед сдачей](docs/README_work_plan.md).
 
 ## Среда разработки
 
 - Dockerfile использует `ros:humble-ros-base-jammy`; системные Python/ROS-зависимости устанавливаются APT, C++ пакет собирается colcon.
 - [`.python-version`](.python-version) содержит `3.10`. Локальная Windows `.venv` — отдельная среда; на этой машине её конфигурация указывает Python 3.12.10. Смена локального Python не требуется для запуска контейнера.
 - [`requirements.txt`](requirements.txt) перечисляет NumPy и Matplotlib; ROS2/rclpy/messages поставляются образом, а исследовательские scripts могут требовать дополнительные системные или локальные зависимости. Этот файл не является полным установщиком ROS-окружения.
-- CPU — основной путь. CUDA и GPU-ускорение не входят в сдачный сценарий.
+- CPU — основной путь. Сведения о [GPU стенде организатора](docs/stages/stage_3/stage_3_organizer_gpu_environment_run.md) не заменяют проверку GPU Docker runtime или замер на самом стенде.
 
 ## Документация
 
 - [Описание решения для сдачи](SOLUTION.md).
 - [Быстрый запуск плеера для проверяющих](docs/README_REVIEWER_PLAYER_QUICKSTART.md).
 - [Чеклист сдачи и repo-gate](docs/README_SUBMISSION_CHECKLIST.md).
-- [Методология и ограничения MVP](docs/README_methodology.md).
-- [Модель шума и результаты экспериментов](docs/README_noise_classifier.md).
-- [Описание датасетов](docs/README_dataset_describtion.md), [границы выборок](docs/README_dataset_audit.md).
-- [Габарит поезда и калибровочные допущения](docs/README_train_clearance.md), [паспорт лидара](docs/README_LiDAR_Specifications.md).
+- [Методология и действующий контракт](docs/README_methodology.md).
+- [Короткая сводка модели и метрик](docs/README_noise_classifier.md).
+- [Актуальный baseline_v3 runtime pipeline](docs/README_noise_classifier_v3.md).
+- [Описание двух архивов](docs/README_dataset_describtion.md), [реестр наблюдений и границы выборок](docs/README_dataset_audit.md).
+- [Габарит и необходимые калибровки](docs/README_train_clearance.md), [паспорт лидара](docs/README_LiDAR_Specifications.md).
+
+Внутренние `docs/stages/`, history-документы и agent-файлы оставлены в
+репозитории как инженерный журнал, но не являются основным маршрутом чтения для
+проверяющего.
 
 ## Структура репозитория
 
@@ -253,13 +270,18 @@ docker stop lidar-detector
 src/          C++ ядро, ROS2 пакет, Python readers и исследовательские модули
 scripts/      запуск, экспорт, replay, обучение и оценка
 config/       контракты, параметры и development-аннотации
-models/       версионированный JSON `candidate_baseline_v2`; runtime использует C++ реализацию
+models/       версионированный JSON assist-модели `candidate_baseline_v2`; runtime использует C++ реализацию
 web/          HTTP-плеер и прежние исследовательские интерфейсы
 dataset/      локальные архивы/распаковки, ignored
 artefacts/    локальные результаты и assets, ignored
 docs/
   README_methodology.md
+  README_work_plan.md
   README_dataset_audit.md
+  stages/     спецификации и отчёты stage_N/stage_N_<purpose>.md
+  reports/    датированные аудиты по категориям
+  tasks/      исторические task specs
+agents/       роли и проверочные чек-листы
 ```
 
 ## Лицензия

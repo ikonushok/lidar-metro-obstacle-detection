@@ -9,8 +9,14 @@
 
 Решение принимает облако точек `sensor_msgs/msg/PointCloud2`, строит локальную
 ось рельсов, протягивает вдоль неё габарит поезда и ищет связные компоненты
-точек внутри контролируемой зоны. Для подавления инфраструктурного шума
-используется лёгкая C++-встроенная модель `candidate_baseline_v2`.
+точек внутри контролируемой зоны. Текущий финальный исполняемый путь —
+`baseline_v3 runtime`: geometry-first gate, boundary/warning для объектов вне
+или выше габарита и temporal model-assist только для слабых/неочевидных случаев.
+Если temporal-ветка не подтверждает такой случай, результат остаётся `UNKNOWN`,
+не `CLEAR`.
+
+`candidate_baseline_v2` сохранён как встроенный score assist-ветки и режим
+сравнения, но не является финальной моделью сдачного решения.
 
 Основной выход:
 
@@ -64,15 +70,16 @@ dataset/raw/cloud_with_fake_obj
 
 Оба режима запуска используют одно C++ ядро.
 
+Актуальный runtime pipeline:
+
 ```text
 PointCloud2 / XYZ
-  -> quality gate входа
-  -> поиск локальной оси рельсов
-  -> построение габарита поезда с tangent-продолжением
-  -> raw CORE-точки внутри габарита
-  -> связные компоненты
-  -> candidate_baseline_v2: reportable candidate / ignored noise
-  -> JSON diagnostics
+  -> rail axis + tangent train envelope
+  -> geometry-first gate
+  -> inside envelope: obstacle
+  -> outside/above envelope: boundary warning, not obstacle
+  -> weak/ambiguous case: temporal model-assist
+  -> no temporal confirmation: UNKNOWN
 ```
 
 Direct player:
@@ -100,18 +107,20 @@ ros2 bag play -> PointCloud2 -> curve_envelope_node -> std_msgs/String JSON
 4. По ним строится локальная ось пути.
 5. Вдоль оси протягивается контролируемый габарит.
 6. Точки внутри CORE-зоны группируются в компоненты.
-7. Модель `candidate_baseline_v2` подавляет компоненты, похожие на шум или
-   инфраструктуру.
-8. Для reportable-компонент вычисляется ближайшая дистанция и диагностический
-   статус.
+7. `baseline_v3` сначала принимает сильные геометрические intrusion-компоненты
+   как препятствие.
+8. Внешние/верхние компоненты переводятся в `boundary/warning`, а слабые или
+   маленькие случаи проходят через temporal model-assist.
+9. Для reportable-компонент вычисляется ближайшая дистанция и диагностический
+   статус; неподтверждённые слабые случаи остаются `UNKNOWN`.
 
-Текущий сдачный режим:
+Текущий исполняемый runtime/smoke-режим:
 
 ```text
 rail_selection_method = development_candidate
 rail_forward_min_m    = 2.0
 forward_extension     = tangent
-noise_filter_mode     = candidate_baseline_v2
+noise_filter_mode     = baseline_v3
 ```
 
 Параметр 80 м в конфигурации tangent-графа — это предел продолжения рабочей
@@ -156,7 +165,7 @@ docker build -t lidar-metro-obstacle-detection:submission .
   -RailSelectionMethod development_candidate `
   -RailForwardMinM 2 `
   -ForwardExtensionMethod tangent `
-  -NoiseFilterMode candidate_baseline_v2 `
+  -NoiseFilterMode baseline_v3 `
   -Image lidar-metro-obstacle-detection:submission `
   -NoBrowser
 ```
@@ -190,7 +199,7 @@ docker run --rm -d --name lidar-detector --shm-size=1g `
   -p rail_selection_method:=development_candidate `
   -p rail_forward_min_m:=2.0 `
   -p forward_extension_method:=tangent `
-  -p noise_filter_mode:=candidate_baseline_v2
+  -p noise_filter_mode:=baseline_v3
 ```
 
 В отдельном окне:
@@ -225,22 +234,23 @@ docker stop lidar-detector
 | Direct player на локальных подготовленных архивах | PASS |
 | `/datasets.json` в плеере | 8 source ID |
 | `cloud_with_fake_obj` manifest | `frame_count=1510`, `runtime_transport=direct_cpp` |
-| `doubleT_obstacle` frame 13 | найден candidate, дистанция около `55.568` м |
-| Headless ROS2 full slowed replay `doubleT_obstacle` | 201 JSON outputs на 201 PointCloud2 inputs |
-| ROS2 alarms on slowed replay | 51 alarm frame |
+| `doubleT_obstacle` frames 13-14 | frame 13 — model-assist candidate waiting; frame 14 — temporal-confirmed candidate, дистанция около `55.568` м |
+| `evaluate_current_model_real_synthetic.py` | real frame runtime: `TP=51`, `FN=1`, `FP alarm=50`, `UNKNOWN=13658`; `cloud_with_fake_obj`: `6/6` positive events, `0` boundary FP |
+| Direct player HTTP timing `new_data` 1050-1150 | processing p95 `52.25` ms; HTTP wall p95 `133.16` ms; HTTP wall p99 `1932.03` ms |
+| ROS2 parity/timing `doubleT_obstacle` | PASS, `201` cases, wall `137.557` s |
 
 Docker image, зафиксированный в проверке:
 
 ```text
-sha256:c4cf115060bd918c1ae7f6347b6afce37abfb4cb73d8cb9c408c54391f63dff1
+sha256:9686850054da221452d9fe0ee65ed4932ad78581274fc947865d8bfa9e7e0ec1
 ```
 
-Во время ROS2 replay на Windows/Docker bind mount наблюдались предупреждения
-`Message queue starved`. Поэтому этот прогон подтверждает интерфейс и
-завершение обработки, но не доказывает real-time throughput.
+Свежий ROS2-прогон подтверждает parity/integration в Docker/Humble, но не
+доказывает production real-time throughput. Direct HTTP timing показывает, что
+C++ compute p95 держится около `52` мс, а full HTTP path имеет длинные хвосты.
 
-Эти проверки подтверждают воспроизводимость интерфейсов сдачного среза, но не
-заменяют скрытую проверку жюри на новых данных.
+Подробный журнал проверок:
+`docs/stages/stage_5/stage_5_submission_release_preparation.md`.
 
 ## 9. Ограничения
 
@@ -248,8 +258,10 @@ sha256:c4cf115060bd918c1ae7f6347b6afce37abfb4cb73d8cb9c408c54391f63dff1
   калибровки монтажа, `/tf`, карты, IMU и одометрии.
 - `source_frame` и направление движения должны быть проверены для нового bag.
 - Расстояние считается от начала координат исходного облака, не от носа поезда.
-- `candidate_baseline_v2` — фильтр кандидатов, а не safety-доказательство
-  свободного пути.
+- `candidate_baseline_v2` — assist/legacy-фильтр, а не финальная модель и не
+  safety-доказательство свободного пути.
+- `baseline_v3` интегрирован в direct/ROS2 runtime, но требует дальнейших
+  независимых replay/latency/throughput-проверок перед production-claim.
 - `UNKNOWN` не превращается в `CLEAR`.
 - Full real-time, p95/p99 latency, drops и ресурсы на целевом стенде не
   заявлены.
@@ -271,13 +283,15 @@ models/noise_classifier_candidate_baseline_v2.json
 web/
 docs/README_REVIEWER_PLAYER_QUICKSTART.md
 docs/README_SUBMISSION_CHECKLIST.md
+docs/stages/stage_5/stage_5_submission_release_preparation.md
 ```
 
 ## 11. Вывод
 
-Сдачный прототип решает задачу как candidate-only pipeline: по облаку точек он
-строит локальный габарит движения поезда, выделяет компоненты внутри него и
-публикует диагностический сигнал о потенциальном препятствии. Решение
-воспроизводимо через Docker, direct player и headless ROS2 replay, но честно
-сохраняет ограничения MVP: отсутствие production-safety claim, отсутствие
-подтверждённого `CLEAR` и отсутствие доказанного real-time throughput.
+Сдачный прототип решает задачу как `baseline_v3 runtime pipeline`: по облаку
+точек он строит локальный габарит движения поезда, принимает сильные
+геометрические intrusion-компоненты, отделяет boundary/warning и подключает
+temporal-assist только для слабых случаев. Решение воспроизводимо через Docker,
+direct player и headless ROS2 replay, но честно сохраняет ограничения MVP:
+отсутствие production-safety claim, отсутствие подтверждённого `CLEAR` и
+отсутствие доказанного real-time throughput.

@@ -89,7 +89,8 @@ std::string UnknownJson(
     const lidar_mosmetro3d::AutoRailsConfig& config,
     std::uint64_t point_count, const std::string& forward_extension_method,
     double arc_extension_horizon_m, double min_arc_radius_m, double max_arc_turn_deg,
-    std::size_t arc_fit_window_pairs, bool lean_benchmark, bool use_model_filter) {
+    std::size_t arc_fit_window_pairs, bool lean_benchmark,
+    const std::string& noise_filter_mode) {
   std::ostringstream json;
   json << std::fixed << std::setprecision(6)
         << "{\"format\":\""
@@ -112,7 +113,7 @@ std::string UnknownJson(
        << ",\"station_length_m\":" << config.station_length
        << ",\"cell_width_m\":" << config.cell_width << "},"
         << "\"point_count\":" << point_count << ",\"rail_pair_count\":0,"
-        << "\"noise_filter_mode\":\"" << (use_model_filter ? "candidate_baseline_v2" : "legacy") << "\",";
+        << "\"noise_filter_mode\":\"" << noise_filter_mode << "\",";
   AppendAutoRailsFailureDiagnosticsJson(json, rails);
   if (lean_benchmark) {
     json << ",\"processing_ms\":0.000000}";
@@ -134,7 +135,7 @@ int main(int argc, char** argv) {
     std::cerr << "usage: curve_pipeline_stream_cli RAIL_FORWARD_MIN_M "
                  "[--observed-only | --arc-limited HORIZON_M | "
                  "--arc-clamped HORIZON_M MIN_RADIUS_M MAX_TURN_DEG] "
-                 "[--arc-fit-window N] [--lean-model-benchmark] [--use-model-filter] "
+                 "[--arc-fit-window N] [--lean-model-benchmark] [--use-model-filter | --use-baseline-v3-filter] "
                  "[--compare-noise-filters] [--profile-model-filter]\n";
     return 2;
   }
@@ -146,6 +147,7 @@ int main(int argc, char** argv) {
     bool arc_clamped = false;
     bool lean_benchmark = false;
     bool use_model_filter = false;
+    bool use_baseline_v3_filter = false;
     bool compare_noise_filters = false;
     bool profile_model_filter = false;
     double arc_extension_horizon_m = 0.0;
@@ -171,8 +173,11 @@ int main(int argc, char** argv) {
         if (lean_benchmark) throw std::runtime_error("duplicate lean benchmark mode");
         lean_benchmark = true;
       } else if (option == "--use-model-filter") {
-        if (use_model_filter) throw std::runtime_error("duplicate model filter mode");
+        if (use_model_filter || use_baseline_v3_filter) throw std::runtime_error("duplicate model filter mode");
         use_model_filter = true;
+      } else if (option == "--use-baseline-v3-filter") {
+        if (use_model_filter || use_baseline_v3_filter) throw std::runtime_error("duplicate model filter mode");
+        use_baseline_v3_filter = true;
       } else if (option == "--compare-noise-filters") {
         if (compare_noise_filters) throw std::runtime_error("duplicate compare noise filters mode");
         compare_noise_filters = true;
@@ -199,6 +204,12 @@ int main(int argc, char** argv) {
     lidar_mosmetro3d::CoreNoiseFilterConfig raw_core_config{};
     raw_core_config.enabled = false;
     const bool active_model_filter = use_model_filter || lean_benchmark;
+    const bool active_baseline_v3_filter = use_baseline_v3_filter;
+    const std::string active_noise_filter_mode =
+        active_baseline_v3_filter ? "baseline_v3"
+        : active_model_filter ? "candidate_baseline_v2" : "legacy";
+    bool previous_baseline_v3_model_alarm = false;
+    int baseline_v3_model_consecutive_alarm_frames = 0;
     const std::string requested_forward_extension_method = observed_only ? "observed_only"
         : arc_limited ? "arc_limited" : arc_clamped ? "arc_clamped" : "tangent";
     while (true) {
@@ -220,10 +231,14 @@ int main(int argc, char** argv) {
       const auto rails = lidar_mosmetro3d::DetectAutoRails(
           xyz.data(), point_count, config, lidar_mosmetro3d::RailSelectionMethod::kDevelopmentCandidate);
       if (rails.rail_pairs.size() < 2) {
+        if (active_baseline_v3_filter) {
+          previous_baseline_v3_model_alarm = false;
+          baseline_v3_model_consecutive_alarm_frames = 0;
+        }
         std::cout << UnknownJson(rails, config, point_count,
                                  requested_forward_extension_method,
                                  arc_extension_horizon_m, min_arc_radius_m, max_arc_turn_deg,
-                                 arc_fit_window_pairs, lean_benchmark, active_model_filter)
+                                 arc_fit_window_pairs, lean_benchmark, active_noise_filter_mode)
                   << "\n" << std::flush;
         continue;
       }
@@ -278,12 +293,15 @@ int main(int argc, char** argv) {
           std::chrono::steady_clock::now() - started).count();
       auto legacy_result = raw_result;
       auto model_result = raw_result;
+      auto baseline_v3_result = raw_result;
       bool legacy_filter_computed = false;
       bool model_filter_computed = false;
+      bool baseline_v3_filter_computed = false;
       double legacy_filter_ms = 0.0;
       double model_filter_ms = 0.0;
+      double baseline_v3_filter_ms = 0.0;
       lidar_mosmetro3d::FrozenNoiseTreeV1Profile model_filter_profile;
-      if (!active_model_filter || compare_noise_filters) {
+      if ((!active_model_filter && !active_baseline_v3_filter) || compare_noise_filters) {
         auto legacy_filter_started = std::chrono::steady_clock::now();
         lidar_mosmetro3d::ApplyCoreNoiseFilter(
             xyz.data(), point_count, legacy_result, active_pairs, noise_config);
@@ -300,9 +318,35 @@ int main(int argc, char** argv) {
             std::chrono::steady_clock::now() - model_filter_started).count();
         model_filter_computed = true;
       }
-      const auto& result = active_model_filter ? model_result : legacy_result;
+      if (active_baseline_v3_filter) {
+        auto baseline_v3_filter_started = std::chrono::steady_clock::now();
+        lidar_mosmetro3d::ApplyBaselineV3(
+            xyz.data(), point_count, baseline_v3_result, noise_config.connectivity_radius_m,
+            profile_model_filter ? &model_filter_profile : nullptr);
+        baseline_v3_filter_ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - baseline_v3_filter_started).count();
+        baseline_v3_filter_computed = true;
+      }
+      const auto& result = active_baseline_v3_filter ? baseline_v3_result
+                         : active_model_filter ? model_result : legacy_result;
       const bool raw_core = result.core_count > 0;
-      const bool intrusion = result.reportable_core_count > 0;
+      const bool baseline_v3_geometry_intrusion =
+          active_baseline_v3_filter && result.baseline_v3_geometry_obstacle_count > 0;
+      const bool baseline_v3_model_frame_intrusion =
+          active_baseline_v3_filter && result.baseline_v3_model_assist_count > 0;
+      if (active_baseline_v3_filter) {
+        if (baseline_v3_model_frame_intrusion && previous_baseline_v3_model_alarm) {
+          ++baseline_v3_model_consecutive_alarm_frames;
+        } else {
+          baseline_v3_model_consecutive_alarm_frames = baseline_v3_model_frame_intrusion ? 1 : 0;
+        }
+        previous_baseline_v3_model_alarm = baseline_v3_model_frame_intrusion;
+      }
+      const bool baseline_v3_model_temporal_intrusion =
+          baseline_v3_model_frame_intrusion && baseline_v3_model_consecutive_alarm_frames >= 2;
+      const bool intrusion = active_baseline_v3_filter
+          ? (baseline_v3_geometry_intrusion || baseline_v3_model_temporal_intrusion)
+          : result.reportable_core_count > 0;
       const bool margin = result.margin_count > 0;
       if (lean_benchmark) {
         const bool model_intrusion = model_result.reportable_core_count > 0;
@@ -355,11 +399,21 @@ int main(int argc, char** argv) {
           std::chrono::steady_clock::now() - wireframe_started).count();
       const double legacy_processing_ms = common_processing_ms + legacy_filter_ms + wireframe_ms;
       const double model_processing_ms = common_processing_ms + model_filter_ms + wireframe_ms;
-      const double active_processing_ms = active_model_filter ? model_processing_ms : legacy_processing_ms;
+      const double baseline_v3_processing_ms = common_processing_ms + baseline_v3_filter_ms + wireframe_ms;
+      const double active_processing_ms = active_baseline_v3_filter ? baseline_v3_processing_ms
+          : active_model_filter ? model_processing_ms : legacy_processing_ms;
+      const bool baseline_v3_boundary_warning =
+          active_baseline_v3_filter && result.baseline_v3_boundary_warning_count > 0;
       const char* status = intrusion ? "OBSERVED_CORE_INTRUSION_CANDIDATE"
+                           : active_baseline_v3_filter && baseline_v3_boundary_warning ? "OBSERVED_BOUNDARY_WARNING"
+                           : active_baseline_v3_filter && raw_core ? "UNKNOWN"
                            : raw_core ? "NO_REPORTABLE_INTRUSION_NOISE_IGNORED"
                            : margin ? "OBSERVED_MARGIN_RETURN" : "UNKNOWN";
-      const char* reason = intrusion ? "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
+      const char* reason = intrusion && active_baseline_v3_filter ? "BASELINE_V3_CONFIRMED_INTRUSION_CANDIDATE"
+                           : intrusion ? "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
+                           : active_baseline_v3_filter && baseline_v3_boundary_warning ? "BASELINE_V3_BOUNDARY_WARNING_NOT_OBSTACLE"
+                           : active_baseline_v3_filter && baseline_v3_model_frame_intrusion ? "BASELINE_V3_MODEL_ASSIST_WAITING_FOR_TEMPORAL_CONFIRMATION"
+                           : active_baseline_v3_filter && raw_core ? "BASELINE_V3_WEAK_OR_UNCONFIRMED_CORE_UNKNOWN_NOT_CLEAR"
                            : raw_core ? "ONLY_SPARSE_CORE_GROUPS"
                            : margin ? "OBSERVED_RETURN_IN_CLEARANCE_MARGIN"
                                     : "NO_RETURNS_INTERSECT_REFERENCE_NOT_CLEAR";
@@ -414,6 +468,20 @@ int main(int argc, char** argv) {
         json << ",\"model_processing_ms\":" << model_processing_ms
              << ",\"model_noise_filter_ms\":" << model_filter_ms;
       }
+      if (baseline_v3_filter_computed) {
+        json << ",\"baseline_v3_processing_ms\":" << baseline_v3_processing_ms
+             << ",\"baseline_v3_filter_ms\":" << baseline_v3_filter_ms
+             << ",\"baseline_v3_geometry_obstacle_count\":"
+             << result.baseline_v3_geometry_obstacle_count
+             << ",\"baseline_v3_boundary_warning_count\":"
+             << result.baseline_v3_boundary_warning_count
+             << ",\"baseline_v3_model_assist_count\":"
+             << result.baseline_v3_model_assist_count
+             << ",\"baseline_v3_model_temporal_consecutive_alarm_frames\":"
+             << baseline_v3_model_consecutive_alarm_frames
+             << ",\"baseline_v3_model_temporal_confirmed_intrusion_candidate_present\":"
+             << (baseline_v3_model_temporal_intrusion ? "true" : "false");
+      }
       json
            << ",\"geometry_basis\":\""
            << (active_pairs.size() <= rails.rail_pairs.size()
@@ -430,10 +498,13 @@ int main(int argc, char** argv) {
            << ",\"connectivity_radius_m\":" << noise_config.connectivity_radius_m
            << ",\"max_axis_span_m\":" << noise_config.max_axis_span_m
            << ",\"max_average_axis_distance_m\":" << noise_config.max_average_axis_distance_m << "},"
-           << "\"noise_filter_mode\":\"" << (active_model_filter ? "candidate_baseline_v2" : "legacy") << "\","
+           << "\"noise_filter_mode\":\"" << active_noise_filter_mode << "\","
            << "\"model_noise_filter_status\":\""
-           << (active_model_filter ? "APPLIED_ACTIVE" : model_filter_computed ? "APPLIED_SHADOW" : "NOT_EVALUATED") << "\","
-           << "\"model_noise_filter_name\":\"candidate_baseline_v2\","
+           << (active_baseline_v3_filter ? "APPLIED_BASELINE_V3_ASSIST"
+               : active_model_filter ? "APPLIED_ACTIVE"
+               : model_filter_computed ? "APPLIED_SHADOW" : "NOT_EVALUATED") << "\","
+           << "\"model_noise_filter_name\":\""
+           << (active_baseline_v3_filter ? "baseline_v3" : "candidate_baseline_v2") << "\","
            << "\"model_noise_filter_type\":\"forest_lite_mean_tree_probability\"";
       if (model_filter_computed) {
         const bool model_intrusion = model_result.reportable_core_count > 0;
