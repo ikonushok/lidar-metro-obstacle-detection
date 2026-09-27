@@ -130,18 +130,32 @@
     `safety_decision_permitted=false`,
     `alarm_seen=true`,
     `alarm_distance_m=55.580002`.
+  - Full slowed ROS2 replay:
+    `ros2 bag play /data --rate 0.2 --read-ahead-queue-size 2` — PASS_WITH_RISKS.
+    Command completed with exit code 0. Echo summary from
+    `/tmp/candidate_echo_full.txt`: 201 JSON records for 201 input
+    `PointCloud2` messages, `alarms=51`, first output
+    `runtime_transport=ros2`,
+    `noise_filter_mode=candidate_baseline_v2`,
+    `system_status=UNKNOWN`,
+    `safety_decision_permitted=false`,
+    first alarm distance `55.580002` m, last status
+    `NO_REPORTABLE_INTRUSION_NOISE_IGNORED`. The replay still emitted repeated
+    `Message queue starved` warnings on Windows/Docker bind mount, so this is
+    completion/interface evidence, not real-time throughput evidence.
 - Validation level achieved: L1 для unit-тестов gate, чистого repo-gate и
   Docker build; L3 для direct-player smoke на локальных hardlink-датасетах;
-  L3/PASS_WITH_RISKS для headless ROS2 smoke на части `doubleT_obstacle`;
+  L3/PASS_WITH_RISKS для headless ROS2 full slowed replay на
+  `doubleT_obstacle`;
   L0/L1 для full real-time/throughput claims.
-- Что не проверено: полный непрерывный ROS2 replay без `Message queue starved`,
-  p95/p99, drops/resources, открытие публичной ссылки из инкогнито, финальные
-  видео и презентация.
+- Что не проверено: ROS2 replay без `Message queue starved`, p95/p99,
+  drops/resources, открытие публичной ссылки из инкогнито, финальные видео и
+  презентация.
 - Известные FP/FN или safety-риски: качество детекции не менялось; прежние
   ограничения `UNKNOWN != CLEAR`, assumed geometry и отсутствие production
   safety сохраняются.
-- Следующий минимальный тест: прогнать полный ROS2 replay на более подходящем
-  диске/стенде или с подобранной очередью без преждевременной остановки, затем
+- Следующий минимальный тест: прогнать ROS2 replay на более подходящем
+  диске/стенде или с подобранной очередью без `Message queue starved`, затем
   записать короткое demo video / screenshots.
 - Residual risk: gate защищает состав репозитория, но не доказывает runtime
   quality, real-time или соответствие скрытой проверке жюри.
