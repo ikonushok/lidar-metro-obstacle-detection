@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="lidar-metro-obstacle-detection — обнаружение препятствий по 3D-лидару в тоннеле метро">
+  <img src="./assets/readme/hero.png" width="100%" alt="lidar-metro-obstacle-detection — обнаружение нештатной геометрии по 3D-лидару в тоннеле метро">
 </p>
 
 # lidar-metro-obstacle-detection
