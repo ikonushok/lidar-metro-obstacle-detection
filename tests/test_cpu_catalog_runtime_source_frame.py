@@ -63,7 +63,7 @@ class CpuCatalogRuntimeSourceFrameTest(unittest.TestCase):
         self.assertIn("noise_filter_mode='baseline_v3'", runtime)
         self.assertIn('declare_parameter<std::string>("noise_filter_mode", "baseline_v3")', node)
         self.assertIn("[string]$NoiseFilterMode = 'baseline_v3'", launcher)
-        self.assertIn("'candidate_baseline_v2', 'baseline_v3'", runtime)
+        self.assertIn("'baseline_v3_assist_score', 'baseline_v3'", runtime)
 
     def test_direct_baseline_v3_unknown_resets_temporal_state(self):
         root = Path(__file__).resolve().parents[1]

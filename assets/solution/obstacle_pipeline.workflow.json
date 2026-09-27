@@ -26,7 +26,7 @@
     { "id": "envelope", "lane": "geometry", "col": 3, "type": "security", "label": "Tangent envelope", "tag": "ASSUMED", "width": 160 },
     { "id": "raw_core", "lane": "components", "col": 3, "type": "database", "label": "Raw CORE", "width": 150 },
     { "id": "components", "lane": "components", "col": 4, "type": "backend", "label": "CORE components", "width": 155 },
-    { "id": "model", "lane": "decision", "col": 4, "type": "backend", "label": "candidate_baseline_v2", "width": 190 },
+    { "id": "model", "lane": "decision", "col": 4, "type": "backend", "label": "baseline_v3_assist_score", "width": 190 },
     { "id": "result", "lane": "decision", "col": 5, "type": "external", "label": "Candidate JSON", "width": 160 },
     { "id": "unknown", "lane": "diagnostics", "col": 5, "type": "security", "label": "UNKNOWN не CLEAR", "width": 190 }
   ],
@@ -44,7 +44,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Основной путь", "items": ["PointCloud2 декодируется в source frame", "AutoRails строит локальную ось", "CORE сохраняется до модели"] },
-    { "dot": "emerald", "title": "Фильтр сигнала", "items": ["candidate_baseline_v2 поднимает reportable-компоненты", "Raw CORE остаётся диагностическим слоем"] },
+    { "dot": "emerald", "title": "Фильтр сигнала", "items": ["baseline_v3_assist_score поднимает reportable-компоненты", "Raw CORE остаётся диагностическим слоем"] },
     { "dot": "rose", "title": "Safety contract", "items": ["UNKNOWN не трактуется как CLEAR", "Отрицательный ответ модели не разрешает движение"] }
   ]
 }

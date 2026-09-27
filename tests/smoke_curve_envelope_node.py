@@ -39,7 +39,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--xyzf", type=Path, required=True)
     parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
-    parser.add_argument("--noise-filter-mode", choices=("legacy", "candidate_baseline_v2"), default="legacy",
+    parser.add_argument("--noise-filter-mode", choices=("legacy", "baseline_v3_assist_score"), default="legacy",
                         help="legacy preserves this historical positive-fixture smoke; model parity has a separate checker")
     parser.add_argument("--rail-selection-method", choices=("baseline", "development_candidate"), default="development_candidate")
     parser.add_argument("--rail-forward-min-m", type=float, default=2.0)
@@ -94,7 +94,7 @@ def main() -> int:
             )
 
         result = publish_until_result("0")
-        if (not args.expect_unknown and args.noise_filter_mode == "candidate_baseline_v2" and
+        if (not args.expect_unknown and args.noise_filter_mode == "baseline_v3_assist_score" and
                 result.get("temporal_confirmation_enabled") is True and
                 result.get("model_frame_intrusion_candidate_present") is True and
                 result.get("intrusion_candidate_present") is False):
@@ -139,7 +139,7 @@ def main() -> int:
             assert result["reason"] == "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
             assert result["intrusion_candidate_present"] is True
             assert result["reportable_intrusion_candidate_present"] is True
-            if args.noise_filter_mode == "candidate_baseline_v2":
+            if args.noise_filter_mode == "baseline_v3_assist_score":
                 assert result["model_frame_intrusion_candidate_present"] is True
                 assert result["model_temporal_confirmed_intrusion_candidate_present"] is True
                 assert result["model_temporal_consecutive_alarm_frames"] >= 2

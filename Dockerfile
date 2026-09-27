@@ -13,4 +13,4 @@ COPY web/ /app/web/
 RUN . /opt/ros/humble/setup.sh && colcon build --merge-install --base-paths /app/src/lidar_mosmetro3d_cpp
 ENV AMENT_PREFIX_PATH=/app/install
 ENV PYTHONPATH=/app/src MPLBACKEND=Agg FASTRTPS_DEFAULT_PROFILES_FILE=/app/config/fastdds.xml
-CMD ["python3", "/app/scripts/audit_bag.py", "--help"]
+CMD ["ros2", "run", "lidar_mosmetro3d_cpp", "curve_envelope_node", "--help"]

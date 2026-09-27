@@ -4,6 +4,8 @@
 !src/**
 !scripts/
 !scripts/**
+scripts/research/
+scripts/research/**
 !tests/
 !tests/**
 !config/
@@ -13,6 +15,4 @@
 !artefacts/
 !artefacts/stage_5/
 !artefacts/stage_5/noise_model_candidate_shared_station_fix_v2_all_sources/
-!artefacts/stage_5/noise_model_candidate_shared_station_fix_v2_all_sources/trained_models/
-!artefacts/stage_5/noise_model_candidate_shared_station_fix_v2_all_sources/trained_models/candidate_baseline_v2.json
 **/__pycache__/

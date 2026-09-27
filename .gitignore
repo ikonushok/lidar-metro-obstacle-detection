@@ -6,12 +6,13 @@
 __pycache__/
 *.pyc
 /artefacts/
+/scripts/research/
 /log/
 /docs/hackathon_documentations/ЛЦТ2026 Шаблон презентации.pptx
 /models/*
 !/models/
 !/models/.gitkeep
-!/models/noise_classifier_candidate_baseline_v2.json
+!/models/baseline_v3_runtime_policy.json
 
 # Submission/local data and heavy generated media
 .venv/
@@ -34,3 +35,4 @@ __pycache__/
 .env
 .env.*
 
+/docs/stages/

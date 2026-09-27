@@ -48,7 +48,7 @@ class CpuCatalogRuntime:
                  noise_filter_mode='baseline_v3'):
         if rail_selection_method not in {'baseline', 'development_candidate'}:
             raise ValueError('unsupported rail selection method')
-        if noise_filter_mode not in {'legacy', 'candidate_baseline_v2', 'baseline_v3'}:
+        if noise_filter_mode not in {'legacy', 'baseline_v3_assist_score', 'baseline_v3'}:
             raise ValueError('unsupported noise filter mode')
         self.noise_filter_mode = noise_filter_mode
         self.runtime_transport = 'ros2'
@@ -206,7 +206,7 @@ class DirectDetailedCpuRuntime:
             raise ValueError('arc extension parameters must be finite and nonnegative/positive')
         if not isinstance(arc_fit_window_pairs, int) or arc_fit_window_pairs < 3:
             raise ValueError('arc fit window must be an integer >= 3')
-        if noise_filter_mode not in {'legacy', 'candidate_baseline_v2', 'baseline_v3'}:
+        if noise_filter_mode not in {'legacy', 'baseline_v3_assist_score', 'baseline_v3'}:
             raise ValueError('unsupported noise filter mode')
         self.rail_selection_method = rail_selection_method
         self.rail_search_config = {
@@ -234,7 +234,7 @@ class DirectDetailedCpuRuntime:
             command.extend(['--arc-clamped', str(float(arc_extension_horizon_m)),
                             str(float(min_arc_radius_m)), str(float(max_arc_turn_deg))])
             command.extend(['--arc-fit-window', str(int(arc_fit_window_pairs))])
-        if noise_filter_mode == 'candidate_baseline_v2':
+        if noise_filter_mode == 'baseline_v3_assist_score':
             command.append('--use-model-filter')
         elif noise_filter_mode == 'baseline_v3':
             command.append('--use-baseline-v3-filter')

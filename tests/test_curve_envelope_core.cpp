@@ -8,7 +8,7 @@
 
 using lidar_mosmetro3d::AnalyzeCurveEnvelope;
 using lidar_mosmetro3d::ApplyBaselineV3;
-using lidar_mosmetro3d::ApplyCandidateBaselineV2;
+using lidar_mosmetro3d::ApplyBaselineV3AssistScore;
 using lidar_mosmetro3d::Bounds;
 using lidar_mosmetro3d::BuildCurveEnvelopeWireframe;
 using lidar_mosmetro3d::ExtendRailPairsForwardArcLimited;
@@ -81,7 +81,7 @@ int main() {
   model_input.labels.assign(model_chain.size() / 3, Zone::kCore);
   model_input.core_count = model_input.labels.size();
   FrozenNoiseTreeV1Profile model_profile;
-  ApplyCandidateBaselineV2(
+  ApplyBaselineV3AssistScore(
       model_chain.data(), model_chain.size() / 3, model_input, 0.25, &model_profile);
   assert(model_input.reportable_core_count == 150);
   assert(model_input.ignored_noise_count == 1);

@@ -15,8 +15,8 @@
 Если temporal-ветка не подтверждает такой случай, результат остаётся `UNKNOWN`,
 не `CLEAR`.
 
-`candidate_baseline_v2` сохранён как встроенный score assist-ветки и режим
-сравнения, но не является финальной моделью сдачного решения.
+Внутренний score слабой ветки перенесён в `baseline_v3`; отдельной финальной
+моделью он не является.
 
 Основной выход:
 
@@ -241,7 +241,7 @@ docker stop lidar-detector
 | `/datasets.json` в плеере | 8 source ID |
 | `cloud_with_fake_obj` manifest | `frame_count=1510`, `runtime_transport=direct_cpp` |
 | `doubleT_obstacle` frames 13-14 | frame 13 — model-assist candidate waiting; frame 14 — temporal-confirmed candidate, дистанция около `55.568` м |
-| `evaluate_current_model_real_synthetic.py` | real frame runtime: `TP=51`, `FN=1`, `FP alarm=50`, `UNKNOWN=13658`; `cloud_with_fake_obj`: `6/6` positive events, `0` boundary FP |
+| Зафиксированная оценка `baseline_v3` | real frame runtime: `TP=51`, `FN=1`, `FP alarm=50`, `UNKNOWN=13658`; `cloud_with_fake_obj`: `6/6` positive events, `0` boundary FP |
 | Direct player HTTP timing `new_data` 1050-1150 | processing p95 `52.25` ms; HTTP wall p95 `133.16` ms; HTTP wall p99 `1932.03` ms |
 | ROS2 parity/timing `doubleT_obstacle` | PASS, `201` cases, wall `137.557` s |
 | Headless ROS2 wrapper smoke | PASS: `run_submission_ros2_demo.ps1`, `ros2 topic echo --once` получил JSON с `runtime_transport=ros2`, `noise_filter_mode=baseline_v3`, `safety_decision_permitted=false` |
@@ -257,10 +257,10 @@ sha256:9686850054da221452d9fe0ee65ed4932ad78581274fc947865d8bfa9e7e0ec1
 C++ compute p95 держится около `52` мс, а full HTTP path имеет длинные хвосты.
 
 Подробный журнал проверок:
-`docs/stages/stage_5/stage_5_submission_release_preparation.md`.
+`docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md`.
 
 Сводка оставшихся разрывов к критериям жюри:
-`docs/reports/submission/submission_gap_closure_20260927.md`.
+`docs/reports/submission/SUBMISSION_READINESS_REPORT.md`.
 
 ## 9. Ограничения
 
@@ -268,8 +268,8 @@ C++ compute p95 держится около `52` мс, а full HTTP path име�
   калибровки монтажа, `/tf`, карты, IMU и одометрии.
 - `source_frame` и направление движения должны быть проверены для нового bag.
 - Расстояние считается от начала координат исходного облака, не от носа поезда.
-- `candidate_baseline_v2` — внутренний assist-score, а не финальная модель и не
-  safety-доказательство свободного пути.
+- `baseline_v3` — единая runtime-policy модель; её внутренний слабый score не
+  является safety-доказательством свободного пути.
 - `baseline_v3` интегрирован в direct/ROS2 runtime, но требует дальнейших
   независимых replay/latency/throughput-проверок перед production-claim.
 - `UNKNOWN` не превращается в `CLEAR`.
@@ -288,13 +288,16 @@ SOLUTION.md
 scripts/prepare_hackathon_datasets.py
 scripts/run_stage_2_cpu_player.ps1
 scripts/run_submission_ros2_demo.ps1
+scripts/serve_stage_2_cpu_catalog.py
+scripts/cpu_catalog_runtime.py
 scripts/check_submission_package.py
 src/cpp/
-models/noise_classifier_candidate_baseline_v2.json
+src/lidar_mosmetro3d_cpp/
+models/baseline_v3_runtime_policy.json
 web/
-docs/README_REVIEWER_PLAYER_QUICKSTART.md
-docs/README_SUBMISSION_CHECKLIST.md
-docs/stages/stage_5/stage_5_submission_release_preparation.md
+docs/REVIEWER_QUICKSTART.md
+docs/SUBMISSION_CHECKLIST.md
+docs/reports/submission/
 ```
 
 ## 11. Вывод

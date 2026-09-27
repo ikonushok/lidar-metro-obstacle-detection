@@ -234,7 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--min-arc-radius-m', type=float, default=60.0)
     parser.add_argument('--max-arc-turn-deg', type=float, default=8.0)
     parser.add_argument('--arc-fit-window-pairs', type=int, default=5)
-    parser.add_argument('--noise-filter-mode', choices=('legacy', 'candidate_baseline_v2', 'baseline_v3'),
+    parser.add_argument('--noise-filter-mode', choices=('legacy', 'baseline_v3_assist_score', 'baseline_v3'),
                         default='baseline_v3')
     args = parser.parse_args()
     serve(args.root, args.port, args.rail_selection_method, args.rail_forward_min_m,

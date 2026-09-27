@@ -46,7 +46,7 @@ class SubmissionPackageCheckTests(unittest.TestCase):
                 "README.md",
                 "SOLUTION.md",
                 "Dockerfile",
-                "models/noise_classifier_candidate_baseline_v2.json",
+                "models/baseline_v3_runtime_policy.json",
                 "scripts/build_current_model_validation_dataset.py",
                 "scripts/evaluate_current_model_real_synthetic.py",
                 "scripts/prepare_hackathon_datasets.py",

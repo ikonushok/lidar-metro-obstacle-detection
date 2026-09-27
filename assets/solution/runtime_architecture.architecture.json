@@ -12,7 +12,7 @@
     { "id": "rosplay", "type": "external", "label": "ros2 bag play", "sublabel": "PointCloud2 stream", "pos": [310, 450], "size": [205, 74], "tag": "handoff" },
     { "id": "core", "type": "backend", "label": "C++ geometry core", "sublabel": "AutoRails -> tangent -> CORE", "pos": [570, 130], "size": [215, 74], "tag": "shared" },
     { "id": "node", "type": "backend", "label": "curve_envelope_node", "sublabel": "ROS2 String / JSON", "pos": [570, 450], "size": [215, 74] },
-    { "id": "model", "type": "security", "label": "ApplyCandidateBaselineV2", "sublabel": "forest-lite obstacle/noise", "pos": [850, 130], "size": [250, 74] },
+    { "id": "model", "type": "security", "label": "ApplyBaselineV3AssistScore", "sublabel": "forest-lite obstacle/noise", "pos": [850, 130], "size": [250, 74] },
     { "id": "contract", "type": "security", "label": "Diagnostics contract", "sublabel": "UNKNOWN, safety=false", "pos": [850, 450], "size": [230, 74] },
     { "id": "viewer", "type": "frontend", "label": "HTTP/WebGL viewer", "sublabel": "visual review", "pos": [1130, 130], "size": [175, 74] },
     { "id": "topic", "type": "messagebus", "label": "Output topic", "sublabel": "/stage_3/... JSON", "pos": [1130, 450], "size": [175, 74] }
@@ -37,6 +37,6 @@
   "cards": [
     { "dot": "cyan", "title": "Direct path", "items": ["Плеер не гоняет кадры через DDS", "Один кадр -> один C++ JSON"] },
     { "dot": "emerald", "title": "ROS2 path", "items": ["Заказчик может запустить ros2 bag play", "Результат публикуется как String/JSON"] },
-    { "dot": "rose", "title": "Общий контракт", "items": ["Оба входа используют одно ядро и candidate_baseline_v2", "UNKNOWN и safety=false сохраняются"] }
+    { "dot": "rose", "title": "Общий контракт", "items": ["Оба входа используют одно ядро и baseline_v3_assist_score", "UNKNOWN и safety=false сохраняются"] }
   ]
 }

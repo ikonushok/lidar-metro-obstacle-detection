@@ -15,7 +15,7 @@
 | Исследование записей | Архив bag → XYZ → прямой C++ → JSON → HTTP-плеер | Да, для просмотра |
 | Проверка заказчиком / сдача | ROS2 PointCloud2 → C++ node → ROS2 String с JSON | Нет |
 
-Интеграционные проверки сохранены в [отчёте direct player](docs/stages/stage_5/stage_5_direct_player_run.md). Это ограниченные проверки интерфейсов, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
+Актуальные проверочные отчёты вынесены в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) и [headless ROS2 demo](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md). Это ограниченные проверки интерфейсов и воспроизводимости, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
 
 Среда сдачи по [ТЗ](docs/hackathon_documentations/5.%20ДепТранспорта.pdf): **Ubuntu 22.04 + ROS 2 Humble + Docker**. Проект подготовлен для [«Лидеров цифровой трансформации»](https://i.moscow/cabinet/hackaton/lct/contest/1233bb5506bc455f86d534b3b40171f1).
 
@@ -34,7 +34,7 @@ PointCloud2 / XYZ
   → если temporal model-assist не подтвердил → UNKNOWN
 ```
 
-Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Внутри assist-ветки сейчас используется переносимый `candidate_baseline_v2` score, но финальным сдачным решением является весь `baseline_v3` pipeline; [короткие метрики](docs/README_noise_classifier.md), [сводка baseline_v3](docs/README_noise_classifier_v3.md).
+Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Финальная сдачная модель описана как единый `baseline_v3` runtime policy в [models/baseline_v3_runtime_policy.json](models/baseline_v3_runtime_policy.json); метод и границы описаны в [методологии](docs/METHODOLOGY.md), численные ограничения — в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
 
 ## Где должны лежать данные
 
@@ -69,7 +69,7 @@ Get-Item dataset\for_hackathon\for_hackathon, `
 
 Также нужны локальные viewer-assets и XML, которые launcher проверяет до сборки.
 **`-RebuildImage` собирает образ, но не создаёт данные, viewer-assets или XML.**
-[Однократная подготовка](docs/README_player_setup.md) описывает их получение.
+[Однократная подготовка](docs/PLAYER_SETUP.md) описывает их получение.
 
 Для **нового датасета заказчика** используйте ROS2-вход ниже, а не CPU catalog:
 catalog сейчас перечисляет известные источники из `dataset/for_hackathon`.
@@ -91,7 +91,7 @@ catalog сейчас перечисляет известные источник�
 
 При обновлении обученной модели этот прямой C++ путь сохраняется. ROS2 остаётся отдельным входом в общее ядро и не добавляется в обработку кадров плеера. После обучения скорость новой модели сравнивается с текущей на одинаковом прямом пути; общность ядра сама по себе не гарантирует одинаковое время разных моделей.
 
-При запущенном Docker Desktop из корня репозитория, после [подготовки архивов и файлов плеера](docs/README_player_setup.md):
+При запущенном Docker Desktop из корня репозитория, после [подготовки архивов и файлов плеера](docs/PLAYER_SETUP.md):
 
 ```powershell
 docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
@@ -148,7 +148,7 @@ ros2 bag play → PointCloud2 → C++ ROS2-узел
 
 Оба входа используют общее C++-ядро. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=baseline_v3`.
 
-Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. [Спецификация](docs/stages/stage_5/stage_5_direct_player.md) и [результаты проверки](docs/stages/stage_5/stage_5_direct_player_run.md).
+Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. Сдачный маршрут: direct player для просмотра подготовленных источников и отдельный headless ROS2 path для `ros2 bag play`.
 
 Для быстрого headless demo можно использовать единый wrapper:
 
@@ -247,52 +247,48 @@ docker stop lidar-detector
 
 Калибровка монтажа, физический динамический габарит и качество на независимых положительных проездах не подтверждены. Положительный интервал разработки — `doubleT_obstacle` **13–64 включительно**, один известный объект; 52 кадра не являются 52 независимыми событиями. Frame metrics, event metrics и UNKNOWN coverage учитываются отдельно.
 
-В текущий запуск не входят CUDA, arc-варианты, deskew, карта, tracking и TTC. `arc_limited` остаётся явным экспериментальным player-режимом; `arc_clamped` доступен только в низкоуровневых C++/ROS2 экспериментах. Их наличие не меняет выбранный `tangent`. Качество и скорость оцениваются раздельно; [результаты измерений](docs/README_noise_classifier.md#время-и-соответствие-тз) указывают версию и область замера. Прямой транспорт не исключает ожидание чтения архива, lock или C++ обработки.
+В текущий запуск не входят CUDA, arc-варианты, deskew, карта, tracking и TTC. `arc_limited` остаётся явным экспериментальным player-режимом; `arc_clamped` доступен только в низкоуровневых C++/ROS2 экспериментах. Их наличие не меняет выбранный `tangent`. Качество и скорость оцениваются раздельно; [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) указывает версию и область замера. Прямой транспорт не исключает ожидание чтения архива, lock или C++ обработки.
 
-Это хакатонный прототип, не сертифицированная система управления торможением. Для финальной сдачи нужно проверять именно текущую версию `baseline_v3` runtime: чистую сборку, direct/ROS2 parity, длинный replay, задержки/очереди/drops и ресурсы. [План работ и задачи перед сдачей](docs/README_work_plan.md).
+Это хакатонный прототип, не сертифицированная система управления торможением. Для финальной сдачи нужно проверять именно текущую версию `baseline_v3` runtime: чистую сборку, direct/ROS2 parity, длинный replay, задержки/очереди/drops и ресурсы. История работ и текущий статус: [development history](docs/DEVELOPMENT_HISTORY_AND_STATUS.md).
 
 ## Среда разработки
 
 - Dockerfile использует `ros:humble-ros-base-jammy`; системные Python/ROS-зависимости устанавливаются APT, C++ пакет собирается colcon.
 - [`.python-version`](.python-version) содержит `3.10`. Локальная Windows `.venv` — отдельная среда; на этой машине её конфигурация указывает Python 3.12.10. Смена локального Python не требуется для запуска контейнера.
 - [`requirements.txt`](requirements.txt) перечисляет NumPy и Matplotlib; ROS2/rclpy/messages поставляются образом, а исследовательские scripts могут требовать дополнительные системные или локальные зависимости. Этот файл не является полным установщиком ROS-окружения.
-- CPU — основной путь. Сведения о [GPU стенде организатора](docs/stages/stage_3/stage_3_organizer_gpu_environment_run.md) не заменяют проверку GPU Docker runtime или замер на самом стенде.
+- CPU — основной путь. GPU/CUDA не входит в сдачный маршрут и не требуется для проверки Docker/ROS2 demo.
 
 ## Документация
 
 - [Описание решения для сдачи](SOLUTION.md).
-- [Быстрый запуск плеера для проверяющих](docs/README_REVIEWER_PLAYER_QUICKSTART.md).
-- [Чеклист сдачи и repo-gate](docs/README_SUBMISSION_CHECKLIST.md).
-- [Срез разрывов к критериям](docs/reports/submission/submission_gap_closure_20260927.md).
-- [Проверка headless ROS2 запуска](docs/reports/submission/headless_ros2_smoke_20260927.md).
-- [Методология и действующий контракт](docs/README_methodology.md).
-- [Короткая сводка модели и метрик](docs/README_noise_classifier.md).
-- [Актуальный baseline_v3 runtime pipeline](docs/README_noise_classifier_v3.md).
-- [Описание двух архивов](docs/README_dataset_describtion.md), [реестр наблюдений и границы выборок](docs/README_dataset_audit.md).
-- [Габарит и необходимые калибровки](docs/README_train_clearance.md), [паспорт лидара](docs/README_LiDAR_Specifications.md).
+- [Быстрый запуск для проверяющих](docs/REVIEWER_QUICKSTART.md).
+- [Чеклист сдачи и repo-gate](docs/SUBMISSION_CHECKLIST.md).
+- [Срез готовности к критериям](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
+- [Проверка headless ROS2 запуска](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md).
+- [Методология и действующий контракт](docs/METHODOLOGY.md).
+- [История работ и текущий статус](docs/DEVELOPMENT_HISTORY_AND_STATUS.md).
+- [Датасеты, наблюдения и ограничения](docs/DATASETS_AND_ASSUMPTIONS.md).
+- [Габарит и необходимые калибровки](docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md), [паспорт лидара](docs/LIDAR_SPEC.md).
 
-Внутренние `docs/stages/`, history-документы и agent-файлы оставлены в
-репозитории как инженерный журнал, но не являются основным маршрутом чтения для
-проверяющего.
+Основной маршрут чтения для проверяющего: `README.md`, `SOLUTION.md`,
+`docs/REVIEWER_QUICKSTART.md` и `docs/SUBMISSION_CHECKLIST.md`.
 
 ## Структура репозитория
 
 ```text
-src/          C++ ядро, ROS2 пакет, Python readers и исследовательские модули
-scripts/      запуск, экспорт, replay, обучение и оценка
+src/          C++ ядро, ROS2 пакет и Python readers для плеера
+scripts/      подготовка данных, запуск плеера, ROS2 demo и package gate
 config/       контракты, параметры и development-аннотации
-models/       версионированный JSON assist-модели `candidate_baseline_v2`; runtime использует C++ реализацию
-web/          HTTP-плеер и прежние исследовательские интерфейсы
+models/       версионированная JSON-модель `baseline_v3_runtime_policy.json`; runtime использует C++ реализацию
+web/          HTTP-плеер
 dataset/      локальные архивы/распаковки, ignored
 artefacts/    локальные результаты и assets, ignored
 docs/
-  README_methodology.md
-  README_work_plan.md
-  README_dataset_audit.md
-  stages/     спецификации и отчёты stage_N/stage_N_<purpose>.md
-  reports/    датированные аудиты по категориям
-  tasks/      исторические task specs
-agents/       роли и проверочные чек-листы
+  METHODOLOGY.md
+  DEVELOPMENT_HISTORY_AND_STATUS.md
+  DATASETS_AND_ASSUMPTIONS.md
+  reports/submission/    сдачные отчёты проверки
+  hackathon_documentations/instruction.md
 ```
 
 ## Лицензия

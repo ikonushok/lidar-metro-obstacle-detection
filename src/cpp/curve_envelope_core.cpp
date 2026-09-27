@@ -554,7 +554,7 @@ ArcLimitedExtensionResult ExtendRailPairsForwardArcClamped(
   return result;
 }
 
-std::array<double, 8> CandidateBaselineV2Features(
+std::array<double, 8> BaselineV3AssistScoreFeatures(
     const float* xyz, const std::vector<std::size_t>& component) {
   const auto stats = ComputeComponentShapeStats(xyz, component);
   const double point_count = static_cast<double>(stats.point_count);
@@ -574,7 +574,7 @@ std::array<double, 8> CandidateBaselineV2Features(
   };
 }
 
-#include "candidate_baseline_v2_model.inc"
+#include "baseline_v3_assist_model.inc"
 
 AnalysisResult AnalyzeCurveEnvelope(const float* xyz, std::size_t point_count,
                                     const std::vector<RailPair>& pairs,
@@ -699,7 +699,7 @@ void ApplyCoreNoiseFilter(const float* xyz, std::size_t point_count,
   FinalizeReportableOutputs(xyz, result);
 }
 
-void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
+void ApplyBaselineV3AssistScore(const float* xyz, std::size_t point_count,
                               AnalysisResult& result,
                               double connectivity_radius_m,
                               FrozenNoiseTreeV1Profile* profile) {
@@ -769,9 +769,9 @@ void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
     }
 
     const auto tree_decision_started = std::chrono::steady_clock::now();
-    const auto features = CandidateBaselineV2Features(xyz, component);
+    const auto features = BaselineV3AssistScoreFeatures(xyz, component);
     const bool model_obstacle =
-        CandidateBaselineV2Score(features) >= kCandidateBaselineV2Threshold;
+        BaselineV3AssistScoreScore(features) >= kBaselineV3AssistScoreThreshold;
     const auto tree_decision_finished = std::chrono::steady_clock::now();
     tree_decision_ms += std::chrono::duration<double, std::milli>(
         tree_decision_finished - tree_decision_started).count();
@@ -878,8 +878,8 @@ void ApplyBaselineV3(const float* xyz, std::size_t point_count,
     if (!boundary_warning &&
         component.size() < kStrongGeometryMinPoints) {
       const auto tree_decision_started = std::chrono::steady_clock::now();
-      const auto features = CandidateBaselineV2Features(xyz, component);
-      model_obstacle = CandidateBaselineV2Score(features) >= kCandidateBaselineV2Threshold;
+      const auto features = BaselineV3AssistScoreFeatures(xyz, component);
+      model_obstacle = BaselineV3AssistScoreScore(features) >= kBaselineV3AssistScoreThreshold;
       const auto tree_decision_finished = std::chrono::steady_clock::now();
       tree_decision_ms += std::chrono::duration<double, std::milli>(
           tree_decision_finished - tree_decision_started).count();

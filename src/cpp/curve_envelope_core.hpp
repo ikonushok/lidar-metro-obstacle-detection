@@ -153,10 +153,10 @@ void ApplyCoreNoiseFilter(const float* xyz, std::size_t point_count,
                           const std::vector<RailPair>& pairs = {},
                           const CoreNoiseFilterConfig& config = {});
 
-// Applies the current forest-lite candidate_baseline_v2.  The raw CORE
+// Applies the current forest-lite baseline_v3_assist_score.  The raw CORE
 // labels/counts remain unchanged; only reportable_*, ignored_noise_* and
 // nearest_reportable_core are updated.
-void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
+void ApplyBaselineV3AssistScore(const float* xyz, std::size_t point_count,
                               AnalysisResult& result,
                               double connectivity_radius_m = 0.25,
                               FrozenNoiseTreeV1Profile* profile = nullptr);

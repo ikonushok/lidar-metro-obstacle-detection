@@ -169,13 +169,13 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       const std::string& header_timestamp_ns) {
     TemporalDecision decision;
     decision.frame_intrusion_candidate_present = frame_intrusion_candidate_present;
-    const bool active = (noise_filter_mode_ == "candidate_baseline_v2" ||
+    const bool active = (noise_filter_mode_ == "baseline_v3_assist_score" ||
                          noise_filter_mode_ == "baseline_v3") &&
                         temporal_confirmation_enabled_;
     if (!active || temporal_required_consecutive_frames_ <= 1) {
       decision.confirmed_intrusion_candidate_present = frame_intrusion_candidate_present;
       decision.consecutive_alarm_frames = frame_intrusion_candidate_present ? 1 : 0;
-      decision.status = (noise_filter_mode_ == "candidate_baseline_v2" ||
+      decision.status = (noise_filter_mode_ == "baseline_v3_assist_score" ||
                          noise_filter_mode_ == "baseline_v3")
           ? (temporal_confirmation_enabled_ ? "BYPASS_REQUIRED_FRAMES_1" : "DISABLED")
           : "NOT_APPLIED_LEGACY_MODE";
@@ -280,7 +280,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
            expanded_.bottom <= core_.bottom && expanded_.top >= core_.top)) return PublishUnknown("INVALID_ENVELOPE", cloud, xyz.size() / 3);
     if (compute_backend_ != "auto" && compute_backend_ != "cpu" && compute_backend_ != "cuda")
       return PublishUnknown("INVALID_COMPUTE_BACKEND", cloud, xyz.size() / 3);
-    if (noise_filter_mode_ != "legacy" && noise_filter_mode_ != "candidate_baseline_v2" &&
+    if (noise_filter_mode_ != "legacy" && noise_filter_mode_ != "baseline_v3_assist_score" &&
         noise_filter_mode_ != "baseline_v3")
       return PublishUnknown("INVALID_NOISE_FILTER_MODE", cloud, xyz.size() / 3);
     lidar_mosmetro3d::RailSelectionMethod selection;
@@ -365,8 +365,8 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       result = lidar_mosmetro3d::AnalyzeCurveEnvelope(
           xyz.data(), xyz.size() / 3, envelope_pairs, core_, expanded_, envelope_noise_config);
     }
-    if (noise_filter_mode_ == "candidate_baseline_v2") {
-      lidar_mosmetro3d::ApplyCandidateBaselineV2(
+    if (noise_filter_mode_ == "baseline_v3_assist_score") {
+      lidar_mosmetro3d::ApplyBaselineV3AssistScore(
           xyz.data(), xyz.size() / 3, result, noise_config_.connectivity_radius_m);
     } else if (noise_filter_mode_ == "baseline_v3") {
       lidar_mosmetro3d::ApplyBaselineV3(
@@ -431,7 +431,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         << ",\"all_core_returns_are_intrusion_candidates\":false,\"margin_return_present\":" << (margin_return_present ? "true" : "false")
          << ",\"compute_backend_requested\":\"" << BackendRequestName() << "\",\"compute_backend_used\":\"" << backend_used << "\","
          << "\"runtime_transport\":\"ros2\",\"noise_filter_mode\":\"" << noise_filter_mode_ << "\","
-         << "\"noise_filter_name\":\"" << (noise_filter_mode_ == "candidate_baseline_v2" ? "candidate_baseline_v2" :
+         << "\"noise_filter_name\":\"" << (noise_filter_mode_ == "baseline_v3_assist_score" ? "baseline_v3_assist_score" :
                                            noise_filter_mode_ == "baseline_v3" ? "baseline_v3" : "legacy_geometry") << "\","
          << "\"rail_selection_method\":\"" << lidar_mosmetro3d::RailSelectionMethodName(selection) << "\","
          << "\"rail_search_config\":{\"forward_min_m\":" << rail_config_.forward_min

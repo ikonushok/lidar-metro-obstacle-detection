@@ -140,7 +140,7 @@ test('viewer threshold changes reportable core components without backend rerun'
 test('viewer uses active backend model split instead of old JS thresholds', () => {
   const result = {
     status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
-    noise_filter_mode: 'candidate_baseline_v2',
+    noise_filter_mode: 'baseline_v3_assist_score',
     core_count: 4,
     core_source_indices: [0, 1, 2, 3],
     reportable_core_count: 4,
@@ -171,7 +171,7 @@ test('viewer uses active backend model split instead of old JS thresholds', () =
 test('viewer temporal filter suppresses one-frame backend model candidates', () => {
   const result = {
     status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
-    noise_filter_mode: 'candidate_baseline_v2',
+    noise_filter_mode: 'baseline_v3_assist_score',
     core_count: 3,
     core_source_indices: [0, 1, 2],
     reportable_core_count: 3,
@@ -210,7 +210,7 @@ test('viewer temporal filter suppresses one-frame backend model candidates', () 
 test('viewer temporal filter keeps backend model candidates confirmed by a neighbor frame', () => {
   const result = {
     status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
-    noise_filter_mode: 'candidate_baseline_v2',
+    noise_filter_mode: 'baseline_v3_assist_score',
     core_count: 3,
     core_source_indices: [0, 1, 2],
     reportable_core_count: 3,

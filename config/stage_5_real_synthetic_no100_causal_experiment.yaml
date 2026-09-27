@@ -1,7 +1,7 @@
 schema_version: 1
 experiment_id: stage5_real_synthetic_no100_causal_v1_20260925
 status: DEVELOPMENT_PROTOCOL_NO_RUNTIME_CHANGE
-baseline: candidate_baseline_v2 + causal_runtime
+baseline: baseline_v3_assist_score + causal_runtime
 temporal_policy: frozen_current_runtime_causal_policy_do_not_retrain
 metric_rule: negative_UNKNOWN_counts_as_FP_without_changing_runtime_UNKNOWN_not_CLEAR
 
@@ -63,7 +63,7 @@ synthetic_train:
   visibility_rule: zero synthetic returns is visibility_failure_not_FN_not_positive_train
 
 candidates:
-  - candidate_baseline_v2 + causal_runtime
+  - baseline_v3_assist_score + causal_runtime
   - random_forest + causal_runtime
   - gradient_boosting + causal_runtime
   - lightgbm + causal_runtime
@@ -71,5 +71,5 @@ candidates:
 validation:
   development_selection: real development only; no real test frames for hard-negative mining or threshold selection
   final_training: allowed real development components plus synthetic_train
-  compare_against: candidate_baseline_v2 + same causal_runtime
+  compare_against: baseline_v3_assist_score + same causal_runtime
   reject_policy: save rejected candidate and do not integrate into C++/ROS2 runtime

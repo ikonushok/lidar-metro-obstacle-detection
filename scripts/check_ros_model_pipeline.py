@@ -88,7 +88,7 @@ def main():
     parser.add_argument('--root', type=Path, default=Path('/workspace'))
     parser.add_argument('--frames', type=int, nargs='+',
                         help='optional sparse frame list; default replays the whole extracted development sequence')
-    parser.add_argument('--noise-filter-mode', choices=('candidate_baseline_v2', 'baseline_v3'),
+    parser.add_argument('--noise-filter-mode', choices=('baseline_v3_assist_score', 'baseline_v3'),
                         default='baseline_v3')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()

@@ -207,7 +207,7 @@ int main(int argc, char** argv) {
     const bool active_baseline_v3_filter = use_baseline_v3_filter;
     const std::string active_noise_filter_mode =
         active_baseline_v3_filter ? "baseline_v3"
-        : active_model_filter ? "candidate_baseline_v2" : "legacy";
+        : active_model_filter ? "baseline_v3_assist_score" : "legacy";
     bool previous_baseline_v3_model_alarm = false;
     int baseline_v3_model_consecutive_alarm_frames = 0;
     const std::string requested_forward_extension_method = observed_only ? "observed_only"
@@ -311,7 +311,7 @@ int main(int argc, char** argv) {
       }
       if (active_model_filter || compare_noise_filters) {
         auto model_filter_started = std::chrono::steady_clock::now();
-        lidar_mosmetro3d::ApplyCandidateBaselineV2(
+        lidar_mosmetro3d::ApplyBaselineV3AssistScore(
             xyz.data(), point_count, model_result, noise_config.connectivity_radius_m,
             profile_model_filter ? &model_filter_profile : nullptr);
         model_filter_ms = std::chrono::duration<double, std::milli>(
@@ -383,7 +383,7 @@ int main(int argc, char** argv) {
                   << "\"arc_fit_window_pairs\":" << arc_fit_window_pairs << ','
                   << "\"arc_fit_window_pairs_used\":" << arc_fit_window_pairs_used << ','
                   << "\"model_noise_filter_ms\":" << model_filter_ms << ','
-                  << "\"model_noise_filter_name\":\"candidate_baseline_v2\"";
+                  << "\"model_noise_filter_name\":\"baseline_v3_assist_score\"";
         if (profile_model_filter) {
           lean_json << ',';
           AppendModelFilterProfileJson(lean_json, model_filter_profile);
@@ -504,7 +504,7 @@ int main(int argc, char** argv) {
                : active_model_filter ? "APPLIED_ACTIVE"
                : model_filter_computed ? "APPLIED_SHADOW" : "NOT_EVALUATED") << "\","
            << "\"model_noise_filter_name\":\""
-           << (active_baseline_v3_filter ? "baseline_v3" : "candidate_baseline_v2") << "\","
+           << (active_baseline_v3_filter ? "baseline_v3" : "baseline_v3_assist_score") << "\","
            << "\"model_noise_filter_type\":\"forest_lite_mean_tree_probability\"";
       if (model_filter_computed) {
         const bool model_intrusion = model_result.reportable_core_count > 0;
