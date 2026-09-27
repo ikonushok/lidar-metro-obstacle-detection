@@ -264,13 +264,10 @@ docker stop lidar-detector
 - [Описание решения для сдачи](SOLUTION.md).
 - [Быстрый запуск плеера для проверяющих](docs/README_REVIEWER_PLAYER_QUICKSTART.md).
 - [Чеклист сдачи и repo-gate](docs/README_SUBMISSION_CHECKLIST.md).
-- [Методология и действующий контракт](docs/README_methodology.md).
-- [Модель шума, разметка и результаты экспериментов](docs/README_noise_classifier.md).
-- [План работ и текущие статусы](docs/README_work_plan.md).
-- [Описание двух архивов](docs/README_dataset_describtion.md), [реестр наблюдений и границы выборок](docs/README_dataset_audit.md).
-- [Габарит и необходимые калибровки](docs/README_train_clearance.md), [паспорт лидара](docs/README_LiDAR_Specifications.md).
-- [История, экспериментальные режимы и восстановление старых артефактов](docs/README_history.md).
-- [Правила проекта](AGENTS.md), [маршрутизатор контекста](agents/context_router.md).
+- [Методология и ограничения MVP](docs/README_methodology.md).
+- [Модель шума и результаты экспериментов](docs/README_noise_classifier.md).
+- [Описание датасетов](docs/README_dataset_describtion.md), [границы выборок](docs/README_dataset_audit.md).
+- [Габарит поезда и калибровочные допущения](docs/README_train_clearance.md), [паспорт лидара](docs/README_LiDAR_Specifications.md).
 
 ## Структура репозитория
 

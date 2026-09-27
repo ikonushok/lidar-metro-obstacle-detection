@@ -9,9 +9,10 @@ __pycache__/
 /log/
 /docs/hackathon_documentations/ЛЦТ2026 Шаблон презентации.pptx
 /models/*
+!/models/
 !/models/.gitkeep
 !/models/noise_classifier_doubleT_obstacle_v1.json
-/models/
+!/models/noise_classifier_candidate_baseline_v2.json
 
 # Submission/local data and heavy generated media
 .venv/

@@ -51,8 +51,10 @@ class SubmissionPackageCheckTests(unittest.TestCase):
                 "scripts/check_submission_package.py",
                 "docs/README_REVIEWER_PLAYER_QUICKSTART.md",
                 "docs/README_SUBMISSION_CHECKLIST.md",
+                "models/noise_classifier_candidate_baseline_v2.json",
                 "src/lidar_mosmetro3d_cpp/package.xml",
                 "src/lidar_mosmetro3d_cpp/src/curve_envelope_node.cpp",
+                "src/cpp/candidate_baseline_v2_model.inc",
             ]:
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,6 +66,32 @@ class SubmissionPackageCheckTests(unittest.TestCase):
 
             self.assertEqual(check_required_paths(root), [])
             self.assertEqual(check_gitignore(root), [])
+
+    def test_required_paths_can_require_git_tracking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in [
+                "README.md",
+                "SOLUTION.md",
+                "Dockerfile",
+                "scripts/prepare_hackathon_datasets.py",
+                "scripts/run_stage_2_cpu_player.ps1",
+                "scripts/check_submission_package.py",
+                "docs/README_REVIEWER_PLAYER_QUICKSTART.md",
+                "docs/README_SUBMISSION_CHECKLIST.md",
+                "models/noise_classifier_candidate_baseline_v2.json",
+                "src/lidar_mosmetro3d_cpp/package.xml",
+                "src/lidar_mosmetro3d_cpp/src/curve_envelope_node.cpp",
+                "src/cpp/candidate_baseline_v2_model.inc",
+            ]:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+
+            errors = check_required_paths(root, tracked={"README.md"})
+
+        self.assertTrue(any("models/noise_classifier_candidate_baseline_v2.json" in error for error in errors))
+        self.assertTrue(any("required path is not tracked by git" in error for error in errors))
 
 
 if __name__ == "__main__":
