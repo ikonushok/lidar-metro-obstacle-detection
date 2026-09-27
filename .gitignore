@@ -13,14 +13,8 @@ __pycache__/
 !/models/noise_classifier_doubleT_obstacle_v1.json
 /models/
 
-
 # Submission/local data and heavy generated media
-/dataset/
-/artefacts/
-/log/
-/tmp/
-/.venv/
-/.idea/
+.venv/
 *.db3
 *.bag
 *.mcap
@@ -39,3 +33,4 @@ __pycache__/
 *.key
 .env
 .env.*
+

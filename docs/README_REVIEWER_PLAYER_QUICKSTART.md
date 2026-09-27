@@ -83,6 +83,19 @@ $manifest | Select-Object dataset_id,frame_count,runtime_transport,noise_filter_
 
 Ожидается `runtime_transport=direct_cpp` и `noise_filter_mode=candidate_baseline_v2`.
 
+## 6. Проверка репозитория перед сдачей
+
+Перед push в публичный репозиторий выполните read-only gate:
+
+```powershell
+python .\scripts\check_submission_package.py
+```
+
+Скрипт проверяет, что в Git не tracked локальные датасеты, архивы ROS2 bag,
+видео, презентации, `.env` и ключи, а также что присутствуют обязательные
+файлы сдачи. Для уже зафиксированного release-коммита можно добавить
+`--require-clean`.
+
 ## Ограничения демо
 
 `UNKNOWN` и отсутствие reportable-кандидата не означают свободный путь. Геометрия и расстояния используют проектные допущения; это хакатонный viewer для проверки воспроизводимости и просмотра, не сертифицированная система управления движением.
