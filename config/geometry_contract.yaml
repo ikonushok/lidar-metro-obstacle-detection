@@ -56,7 +56,7 @@ train_profile:
   intended_scope: ALL_MOSCOW_METRO_ROLLING_STOCK
   selection_mode: UNIVERSAL_FLEET_ENVELOPE_DEFAULT
   individual_profile_override: ALLOWED_AFTER_VALIDATION
-  source_document: docs/README_train_clearance.md#справочные-размеры-вагонов
+  source_document: docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md#справочные-размеры-вагонов
   polygon_in_working_frame:
     coordinate_system: hackathon_track_lidar_livox
     units: m
@@ -71,7 +71,7 @@ universal_fleet_envelope:
   status: ASSUMED_HACKATHON
   composition: PROJECT_ASSUMED_OUTER_RECTANGLE_FOR_ALL_FLEET_DEMO
   current_pipeline_strategy: UNIVERSAL_FLEET_ENVELOPE
-  source_document: docs/README_train_clearance.md#справочные-размеры-вагонов
+  source_document: docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md#справочные-размеры-вагонов
   polygon_in_working_frame:
     coordinate_system: hackathon_track_lidar_livox
     units: m
@@ -97,7 +97,7 @@ universal_fleet_envelope:
       max: 3.700
     shape: AXIS_ALIGNED_OUTER_RECTANGLE
   reference_sources:
-    - docs/README_train_clearance.md
+    - docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md
   safety_decision_permitted: false
 
 visualization_overlay:

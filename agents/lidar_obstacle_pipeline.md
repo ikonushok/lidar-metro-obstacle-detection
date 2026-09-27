@@ -13,8 +13,8 @@
 ## Inspect First / Изучить сначала
 
 1. `AGENTS.md` и результат `agents/context_router.md`.
-2. Требование ТЗ, этап/очередь `docs/README_work_plan.md`, релевантные разделы `docs/README_methodology.md` и `docs/README_dataset_audit.md`.
-3. Для подготовки сдачи: `docs/README_SUBMISSION_CHECKLIST.md` как чеклист упаковки и `docs/reports/submission/` как evidence уже выполненных smoke/gap-проверок.
+2. Требование ТЗ, этап/очередь `docs/DEVELOPMENT_HISTORY_AND_STATUS.md`, релевантные разделы `docs/METHODOLOGY.md` и `docs/DATASETS_AND_ASSUMPTIONS.md`.
+3. Для подготовки сдачи: `docs/SUBMISSION_CHECKLIST.md` как чеклист упаковки и `docs/reports/submission/` как evidence уже выполненных smoke/gap-проверок.
 4. Существующие package manifests, launch/config, message definitions и код изменяемой стадии.
 5. Ближайшие unit/integration tests и доступные малые fixtures.
 6. Для data-dependent задачи — metadata/описание bag и небольшой сценарий, не весь набор по умолчанию.
@@ -23,7 +23,7 @@
 
 ## Рабочий цикл
 
-1. Создать экземпляр task spec в `docs/stages/stage_N/stage_N_<purpose>.md`: пункт ТЗ, цель, non-goals, allowed files, режим/входы, contracts at risk, acceptance.
+1. Создать экземпляр task spec в `artefacts/task_specs/<purpose>.md`: пункт ТЗ, цель, non-goals, allowed files, режим/входы, contracts at risk, acceptance.
 2. Построить карту `input -> transform -> selection -> estimate -> decision -> output`.
 3. Определить единицы, frame, направление transform и временную базу.
 4. Отделить метод, допущение, калибруемый параметр и проверяемую гипотезу.
@@ -32,7 +32,7 @@
 7. Выполнить самый маленький содержательный тест, затем доступный replay/integration check.
 8. Перед принятием safety-sensitive изменения провести отдельный проход по safety_geometry_reviewer с diff и результатами негативного сценария.
 9. После safety-review, если он требовался, отдельно проверить доказательства по validation_reviewer. Не называть последовательные проходы одного агента независимым review.
-10. Сохранить отчёт о выполнении этапа в `docs/stages/stage_N/stage_N_<purpose>.md`; другой отчёт — в `docs/reports/<category>/`. Сырые результаты и визуализации оставить в `artefacts/`.
+10. Сохранить отчёт о выполнении этапа в `artefacts/task_specs/<purpose>.md`; другой отчёт — в `docs/reports/<category>/`. Сырые результаты и визуализации оставить в `artefacts/`.
 
 ## Checklist / Чек-лист по стадиям
 
@@ -116,7 +116,7 @@
 
 - Промежуточно: Dockerfile и/или образ, работоспособный прототип, краткое описание гипотезы, минимальная демонстрация и первые эксперименты.
 - Финально: контейнер, исходники, README с проверенными build/run/replay и параметрами, архитектура, описание алгоритма/ограничений, результаты экспериментов, короткое видео и демонстрация на контрольном bag.
-- `docs/README_work_plan.md` фиксирует очередь и границы работ; `docs/README_SUBMISSION_CHECKLIST.md` фиксирует упаковочные шаги; `docs/reports/submission/` фиксирует только уже выполненный evidence с датой и уровнем проверки.
+- `docs/DEVELOPMENT_HISTORY_AND_STATUS.md` фиксирует очередь и границы работ; `docs/SUBMISSION_CHECKLIST.md` фиксирует упаковочные шаги; `docs/reports/submission/` фиксирует только уже выполненный evidence с датой и уровнем проверки.
 - Для визуализации подходит RViz2 или другое средство. Состояние каждого материала фиксировать отдельно; наличие текста или скриншота не доказывает запуск.
 - Карта, deskew, tracking, TTC, confidence, риск и классификация не обязательны для первого baseline; отмечать статус, входные условия и эффект каждого включённого расширения.
 

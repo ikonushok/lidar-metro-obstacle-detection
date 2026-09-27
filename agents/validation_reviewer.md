@@ -28,7 +28,7 @@
 - manifest разделения development/calibration/held-out test;
 - evaluator/matching rules и отчёты по range/size slices;
 - для pack-а: `AGENTS.md` и все активные файлы `agents/`.
-- пункт ТЗ, `docs/README_work_plan.md`, `docs/README_SUBMISSION_CHECKLIST.md`, `docs/README_dataset_audit.md`, релевантные `docs/reports/submission/` и статус материалов промежуточной/финальной сдачи.
+- пункт ТЗ, `docs/DEVELOPMENT_HISTORY_AND_STATUS.md`, `docs/SUBMISSION_CHECKLIST.md`, `docs/DATASETS_AND_ASSUMPTIONS.md`, релевантные `docs/reports/submission/` и статус материалов промежуточной/финальной сдачи.
 
 ## Checklist / Чек-лист
 
@@ -77,7 +77,7 @@
 
 ## Report / Формат отчёта
 
-Отчёт о выполнении этапа сохранять в `docs/stages/stage_N/stage_N_<purpose>.md`; отчёт вне этапа — в `docs/reports/<category>/`. Не создавать новые отчёты в корневом `reports/`.
+Отчёт о выполнении этапа сохранять в `artefacts/task_specs/<purpose>.md`; отчёт вне этапа — в `docs/reports/<category>/`. Не создавать новые отчёты в корневом `reports/`.
 
 - claim и verdict;
 - achieved level / достигнутый L0–L5;

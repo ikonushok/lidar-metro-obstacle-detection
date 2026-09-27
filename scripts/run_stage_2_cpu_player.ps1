@@ -4,7 +4,6 @@ param(
     [switch]$NoBrowser,
     [Alias('RebuildResults')]
     [switch]$RebuildImage,
-    [switch]$Measure,
     [ValidateSet('baseline', 'development_candidate')]
     [string]$RailSelectionMethod = 'development_candidate',
     [ValidateRange(0.0, 10.0)]
@@ -22,11 +21,7 @@ param(
     [ValidateSet('legacy', 'baseline_v3_assist_score', 'baseline_v3')]
     [string]$NoiseFilterMode = 'baseline_v3',
     [string]$Image = 'lidar-mosmetro3d:stage-4-cpu-viewer',
-    [string]$Dockerfile = '',
-    [ValidateRange(0, 1000000)]
-    [int]$FirstIndex = 1050,
-    [ValidateRange(0, 1000000)]
-    [int]$LastIndex = 1150
+    [string]$Dockerfile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,29 +44,12 @@ $rosDomainId = ($Port % 232) + 1
 $profile = Join-Path $projectRoot 'artefacts\stage_3\cpp_envelope_core\fastdds_udp_smoke.xml'
 $viewerAssets = Join-Path $projectRoot 'artefacts\stage_4\cpu_viewer\vendor\three.min.js'
 
-if ($LastIndex -lt $FirstIndex) { throw 'LastIndex must be greater than or equal to FirstIndex.' }
 if (-not (Test-Path -LiteralPath $profile)) { throw "Missing Fast DDS UDP profile: $profile" }
 if (-not (Test-Path -LiteralPath $viewerAssets)) { throw "Missing viewer assets. Run the previous CPU viewer export once." }
 & docker image inspect $image --format '{{.Id}}' 2>$null | Out-Null
 if ($RebuildImage -or $LASTEXITCODE -ne 0) {
     & docker build -t $image -f $dockerfilePath $projectRoot
     if ($LASTEXITCODE -ne 0) { throw "CPU viewer image build failed (exit $LASTEXITCODE)" }
-}
-
-if ($Measure) {
-    & docker run --rm `
-        -e ROS_DOMAIN_ID=$rosDomainId `
-        -e FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/artefacts/stage_3/cpp_envelope_core/fastdds_udp_smoke.xml `
-        --mount "type=bind,source=$projectRoot,target=/workspace,readonly" `
-        --mount "type=bind,source=$projectRoot\artefacts\stage_4,target=/output" `
-        $image python3 /app/scripts/measure_cpu_catalog_window.py --root /workspace `
-        --first-index $FirstIndex --last-index $LastIndex --rail-selection-method $RailSelectionMethod `
-        --rail-forward-min-m $RailForwardMinM --forward-extension-method $ForwardExtensionMethod `
-        --arc-extension-horizon-m $ArcExtensionHorizonM --min-arc-radius-m $MinArcRadiusM `
-        --max-arc-turn-deg $MaxArcTurnDeg --arc-fit-window-pairs $ArcFitWindowPairs `
-        --noise-filter-mode $NoiseFilterMode `
-        --output /output/cpu_catalog_metrics.json
-    if ($LASTEXITCODE -ne 0) { throw "CPU contiguous-window measurement failed (exit $LASTEXITCODE)" }
 }
 
 $running = @(& docker ps --filter "publish=$Port" --format '{{.ID}}')

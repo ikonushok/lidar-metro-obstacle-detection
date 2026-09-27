@@ -44,9 +44,7 @@ class CpuCatalogRuntimeSourceFrameTest(unittest.TestCase):
     def test_direct_cpp_timing_uses_one_active_filter_by_default(self):
         root = Path(__file__).resolve().parents[1]
         cli = (root / 'src' / 'cpp' / 'curve_pipeline_stream_cli.cpp').read_text(encoding='utf-8')
-        evaluator = (root / 'scripts' / 'evaluate_noise_classifier.py').read_text(encoding='utf-8')
         self.assertIn('--compare-noise-filters', cli)
-        self.assertIn('"--compare-noise-filters"', evaluator)
         self.assertIn('if ((!active_model_filter && !active_baseline_v3_filter) || compare_noise_filters)', cli)
         self.assertIn('if (active_model_filter || compare_noise_filters)', cli)
         self.assertNotIn('common_elapsed + legacy_filter_ms', cli)

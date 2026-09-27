@@ -6,9 +6,9 @@
 
 - запрос пользователя;
 - `AGENTS.md`;
-- релевантные требования `docs/hackathon_documentations/5. ДепТранспорта.pdf`, этап/очередь `docs/README_work_plan.md` и факты `docs/README_dataset_audit.md`;
-- релевантные разделы `docs/README_methodology.md`;
-- для сдачи: `docs/README_SUBMISSION_CHECKLIST.md` как упаковочный чеклист и `docs/reports/submission/` как датированные evidence-отчёты;
+- релевантные требования `docs/hackathon_documentations/5. ДепТранспорта.pdf`, этап/очередь `docs/DEVELOPMENT_HISTORY_AND_STATUS.md` и факты `docs/DATASETS_AND_ASSUMPTIONS.md`;
+- релевантные разделы `docs/METHODOLOGY.md`;
+- для сдачи: `docs/SUBMISSION_CHECKLIST.md` как упаковочный чеклист и `docs/reports/submission/` как датированные evidence-отчёты;
 - только связанные с задачей код, конфигурации, тесты и вывод команд.
 
 ## Task Modes / Сначала классифицировать задачу
@@ -29,12 +29,12 @@ Select one primary agent and at most one triggered reviewer.
 | Триггер | Primary context / первый контекст | Основной агент | Reviewer | Проверка |
 |---|---|---|---|---|
 | Обычная локальная правка | `AGENTS.md`, файл задачи, соседний тест | текущий агент по правилам `AGENTS.md` | нет | узкий тест |
-| PointCloud2, ROI, filtering, clustering, tracking, ROS2 pipeline | релевантные части `docs/README_methodology.md`, код и конфиг стадии | `agents/lidar_obstacle_pipeline.md` | нет по умолчанию | тест стадии + replay/smoke при наличии данных |
+| PointCloud2, ROI, filtering, clustering, tracking, ROS2 pipeline | релевантные части `docs/METHODOLOGY.md`, код и конфиг стадии | `agents/lidar_obstacle_pipeline.md` | нет по умолчанию | тест стадии + replay/smoke при наличии данных |
 | TF, часы, deskew, alignment, envelope, background, risk, temporal policy, фильтры или геометрические/distance-aware пороги | методология + аудит + изменённые контракты и тесты | `agents/lidar_obstacle_pipeline.md` | `agents/safety_geometry_reviewer.md` | границы/низкое препятствие/сбой нужного входа; затем отдельно validation метрик |
 | Evaluator, matching, split или оценка метрик | раздел 17 методологии, аудит, split manifest, evaluator, config | `agents/lidar_obstacle_pipeline.md` | `agents/validation_reviewer.md` | split-by-run и отчёт по срезам; изменения детектора сначала по строке safety |
 | Docker, зависимости, окружение Humble | ТЗ §3, этап 1 плана, существующие Dockerfile/requirements/package manifests | `agents/lidar_obstacle_pipeline.md` | `agents/validation_reviewer.md` | сборка без ручных зависимостей, чтение обычного и obstacle bag; проверить формат/QoS |
-| Аудит датасета | docs/README_dataset_audit.md, metadata, schema/topics, малые образцы | `agents/lidar_obstacle_pipeline.md` | нет для чтения | объём выборки, структура и факты отдельно от гипотез; изменение входного контракта направить в safety |
-| Промежуточная/финальная сдача | ТЗ §4–8, `docs/README_work_plan.md`, `docs/README_SUBMISSION_CHECKLIST.md`, `docs/reports/submission/`, README/SOLUTION, артефакты и вывод запусков | `agents/lidar_obstacle_pipeline.md` | `agents/validation_reviewer.md` | checklist сдачи, чистая сборка/run/replay, новый путь bag, видео и эксперименты |
+| Аудит датасета | docs/DATASETS_AND_ASSUMPTIONS.md, metadata, schema/topics, малые образцы | `agents/lidar_obstacle_pipeline.md` | нет для чтения | объём выборки, структура и факты отдельно от гипотез; изменение входного контракта направить в safety |
+| Промежуточная/финальная сдача | ТЗ §4–8, `docs/DEVELOPMENT_HISTORY_AND_STATUS.md`, `docs/SUBMISSION_CHECKLIST.md`, `docs/reports/submission/`, README/SOLUTION, артефакты и вывод запусков | `agents/lidar_obstacle_pipeline.md` | `agents/validation_reviewer.md` | checklist сдачи, чистая сборка/run/replay, новый путь bag, видео и эксперименты |
 | Утверждение «тесты прошли», «real-time», «готово» | изменённые файлы и полный вывод команд | `agents/validation_reviewer.md` | нет | L0–L5 по доказательствам |
 | Многофайловая задача | запрос и допустимый scope | `agents/task_spec_short.md`, затем профильный агент | только по триггеру | из task spec |
 
@@ -65,4 +65,4 @@ Select one primary agent and at most one triggered reviewer.
 - защищённые контракты;
 - target validation level / целевой уровень валидации и конкретные команды/сценарии;
 - stop conditions.
-- путь отчёта: `docs/stages/stage_N/` для выполнения этапа либо `docs/reports/<category>/` для прочего отчёта.
+- путь отчёта: `artefacts/task_specs/` для выполнения этапа либо `docs/reports/<category>/` для прочего отчёта.
