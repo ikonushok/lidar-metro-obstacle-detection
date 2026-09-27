@@ -79,16 +79,26 @@
     репозитории — FAIL: найдены tracked `artefacts/` и `dataset/.gitkeep`.
     Это ожидаемое расхождение исходного research repo и чистой сдачной копии;
     gate должен проходить в `lidar-metro-obstacle-detection`.
-- Validation level achieved: L1 для unit-тестов gate; L0 для полного
-  соответствия ТЗ до чистого Docker/ROS2 replay.
+  - в сдачной копии `scripts\check_submission_package.py` — PASS, tracked
+    files: 419 до коммита gate, 423 после добавления gate.
+  - в сдачной копии
+    `scripts\check_submission_package.py --require-clean` — PASS на commit
+    `0fd6bed`.
+  - в сдачной копии
+    `docker build -t lidar-metro-obstacle-detection:submission .` — PASS;
+    build context 1.39 MB; image
+    `sha256:c4cf115060bd918c1ae7f6347b6afce37abfb4cb73d8cb9c408c54391f63dff1`,
+    size 524563646 bytes.
+- Validation level achieved: L1 для unit-тестов gate, чистого repo-gate и
+  Docker build; L0/L1 для полного соответствия ТЗ до ROS2 replay на данных.
 - Что не проверено: финальный Docker build, полный ROS2 replay, p95/p99,
   drops/resources, открытие публичной ссылки из инкогнито, финальные видео и
   презентация.
 - Известные FP/FN или safety-риски: качество детекции не менялось; прежние
   ограничения `UNKNOWN != CLEAR`, assumed geometry и отсутствие production
   safety сохраняются.
-- Следующий минимальный тест: перенести gate в сдачную копию
-  `C:\Users\Ilya\PycharmProjects\lidar-metro-obstacle-detection`, выполнить
-  `python scripts/check_submission_package.py`, затем Docker build/player smoke.
+- Следующий минимальный тест: выполнить player smoke и ROS2/headless replay на
+  подготовленном `dataset/extracted/doubleT_obstacle`, затем записать короткое
+  demo video / screenshots.
 - Residual risk: gate защищает состав репозитория, но не доказывает runtime
   quality, real-time или соответствие скрытой проверке жюри.
