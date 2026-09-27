@@ -75,6 +75,12 @@ docker build -t lidar-metro-obstacle-detection:submission .
 ros2 bag play -> curve_envelope_node -> /stage_3/curve_envelope_candidate
 ```
 
+Быстрый wrapper:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 -BuildImage -StopExisting
+```
+
 Проверяемые признаки результата:
 
 - публикуется JSON в `std_msgs/String`;
@@ -93,6 +99,10 @@ ros2 bag play -> curve_envelope_node -> /stage_3/curve_envelope_candidate
 - презентация;
 - прототип: ссылка на репозиторий/инструкцию или скринкаст;
 - дополнительные материалы: демонстрационное видео, схемы, список ограничений.
+- внутренний evidence/gap report:
+  `docs/reports/submission/submission_gap_closure_20260927.md`.
+- smoke report headless ROS2:
+  `docs/reports/submission/headless_ros2_smoke_20260927.md`.
 
 ## 6. Stop-code
 

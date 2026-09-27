@@ -98,6 +98,25 @@ python .\scripts\check_submission_package.py
 файлы сдачи. Для уже зафиксированного release-коммита можно добавить
 `--require-clean`.
 
+## 7. Headless ROS2 demo без браузера
+
+Для сценария жюри `ros2 bag play -> PointCloud2 -> JSON` используйте wrapper:
+
+```powershell
+python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
+.\scripts\run_submission_ros2_demo.ps1 -BuildImage -StopExisting
+```
+
+Он запускает detector container с `baseline_v3` и печатает команды для
+`ros2 topic echo`, `ros2 bag info` и `ros2 bag play`. Для немедленного replay в
+том же окне можно добавить `-Play`; для демонстрации JSON-выхода удобнее
+оставить replay отдельной командой и параллельно открыть `topic echo`.
+
+По умолчанию wrapper печатает replay-команду с `--rate 0.2` и
+`--read-ahead-queue-size 20`: это проверенный demo-режим для большого
+`doubleT_obstacle` bag на Windows/Docker bind mount. `--rate 1.0` использовать
+только как отдельную throughput-проверку с фиксацией starvation/drops/ресурсов.
+
 ## Ограничения демо
 
 `UNKNOWN` и отсутствие reportable-кандидата не означают свободный путь. Геометрия и расстояния используют проектные допущения; это хакатонный viewer для проверки воспроизводимости и просмотра, не сертифицированная система управления движением.

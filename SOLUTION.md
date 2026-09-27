@@ -182,6 +182,12 @@ http://localhost:8100/
 
 ### 7.4. Запустить headless ROS2 replay
 
+Короткий wrapper для запуска detector container и печати готовых команд:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 -BuildImage -StopExisting
+```
+
 Пример для распакованного `dataset/extracted/doubleT_obstacle`:
 
 ```powershell
@@ -213,7 +219,7 @@ docker exec -it lidar-detector /ros_entrypoint.sh `
 
 ```powershell
 docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag info /data
-docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 0.2 --read-ahead-queue-size 2
+docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 0.2 --read-ahead-queue-size 20
 ```
 
 Остановить:
@@ -238,6 +244,7 @@ docker stop lidar-detector
 | `evaluate_current_model_real_synthetic.py` | real frame runtime: `TP=51`, `FN=1`, `FP alarm=50`, `UNKNOWN=13658`; `cloud_with_fake_obj`: `6/6` positive events, `0` boundary FP |
 | Direct player HTTP timing `new_data` 1050-1150 | processing p95 `52.25` ms; HTTP wall p95 `133.16` ms; HTTP wall p99 `1932.03` ms |
 | ROS2 parity/timing `doubleT_obstacle` | PASS, `201` cases, wall `137.557` s |
+| Headless ROS2 wrapper smoke | PASS: `run_submission_ros2_demo.ps1`, `ros2 topic echo --once` получил JSON с `runtime_transport=ros2`, `noise_filter_mode=baseline_v3`, `safety_decision_permitted=false` |
 
 Docker image, зафиксированный в проверке:
 
@@ -252,13 +259,16 @@ C++ compute p95 держится около `52` мс, а full HTTP path име�
 Подробный журнал проверок:
 `docs/stages/stage_5/stage_5_submission_release_preparation.md`.
 
+Сводка оставшихся разрывов к критериям жюри:
+`docs/reports/submission/submission_gap_closure_20260927.md`.
+
 ## 9. Ограничения
 
 - Геометрия габарита имеет статус engineering assumption: нет внешней
   калибровки монтажа, `/tf`, карты, IMU и одометрии.
 - `source_frame` и направление движения должны быть проверены для нового bag.
 - Расстояние считается от начала координат исходного облака, не от носа поезда.
-- `candidate_baseline_v2` — assist/legacy-фильтр, а не финальная модель и не
+- `candidate_baseline_v2` — внутренний assist-score, а не финальная модель и не
   safety-доказательство свободного пути.
 - `baseline_v3` интегрирован в direct/ROS2 runtime, но требует дальнейших
   независимых replay/latency/throughput-проверок перед production-claim.
@@ -277,6 +287,7 @@ README.md
 SOLUTION.md
 scripts/prepare_hackathon_datasets.py
 scripts/run_stage_2_cpu_player.ps1
+scripts/run_submission_ros2_demo.ps1
 scripts/check_submission_package.py
 src/cpp/
 models/noise_classifier_candidate_baseline_v2.json

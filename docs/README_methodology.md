@@ -31,7 +31,7 @@
 |---|---|
 | Чтение PointCloud2/конечных ненулевых XYZ | Реализовано; source frame/header сохраняются; физическая калибровка остаётся assumed |
 | Рельсы/габарит | C++ локальная цепочка наблюдаемых пар + synthetic tangent, fmin=2, fmax=80; [сечения](README_train_clearance.md) |
-| Компоненты/модель | Runtime: связность 0,25 м и `baseline_v3` как geometry-first + boundary/warning + temporal-assist policy; `candidate_baseline_v2` сохранён как assist/legacy-режим; не PCA/нейросеть и не семантические классы |
+| Компоненты/модель | Runtime: связность 0,25 м и `baseline_v3` как geometry-first + boundary/warning + temporal-assist policy; `candidate_baseline_v2` используется только как внутренний assist-score; не PCA/нейросеть и не семантические классы |
 | Выход | `intrusion_candidate_present`, `nearest_reportable_intrusion_distance_from_source_origin_m`, raw/reportable/noise, status; `system_status=UNKNOWN`, safety=false |
 | Deskew/TF преобразование/фон/карта | Не выполняются текущей покадровой цепочкой; необходимые входы/доказательства для включения описаны ниже |
 | Distance-aware grouping/PCA/tracking/TTC/risk | Проектные расширения; в текущий `baseline_v3` runtime не входят, кроме узкого temporal-assist для слабых/неочевидных случаев |

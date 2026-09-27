@@ -51,9 +51,12 @@ class SubmissionPackageCheckTests(unittest.TestCase):
                 "scripts/evaluate_current_model_real_synthetic.py",
                 "scripts/prepare_hackathon_datasets.py",
                 "scripts/run_stage_2_cpu_player.ps1",
+                "scripts/run_submission_ros2_demo.ps1",
                 "scripts/check_submission_package.py",
                 "docs/README_REVIEWER_PLAYER_QUICKSTART.md",
                 "docs/README_SUBMISSION_CHECKLIST.md",
+                "docs/reports/submission/submission_gap_closure_20260927.md",
+                "docs/reports/submission/headless_ros2_smoke_20260927.md",
                 "src/lidar_mosmetro3d_cpp/package.xml",
                 "src/lidar_mosmetro3d_cpp/src/curve_envelope_node.cpp",
             ]:

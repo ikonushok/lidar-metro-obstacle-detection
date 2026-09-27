@@ -106,10 +106,8 @@ docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
 
 Откройте [http://localhost:8100/](http://localhost:8100/), выберите датасет и нажмите **▶ Запуск**. Плеер получает облако и соответствующий JSON от C++; в режиме `baseline_v3` использует готовые индексы obstacle/boundary/model-assist/noise и геометрию. `CORE` до фильтра может содержать инфраструктуру; boundary/warning и `UNKNOWN` не означают подтверждённый свободный путь.
 
-Историческая визуальная проверка v2-best из
-[README_noise_classifier_v2.md](docs/README_noise_classifier_v2.md) сохранена
-только как legacy/reference. Для сдачи и smoke-запуска использовать команду
-выше с `-NoiseFilterMode baseline_v3`.
+Для сдачи и smoke-запуска использовать команду выше с
+`-NoiseFilterMode baseline_v3`.
 
 Проверить выбранный режим и один результат:
 
@@ -151,6 +149,17 @@ ros2 bag play → PointCloud2 → C++ ROS2-узел
 Оба входа используют общее C++-ядро. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=baseline_v3`.
 
 Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. [Спецификация](docs/stages/stage_5/stage_5_direct_player.md) и [результаты проверки](docs/stages/stage_5/stage_5_direct_player_run.md).
+
+Для быстрого headless demo можно использовать единый wrapper:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 -BuildImage -StopExisting
+```
+
+Скрипт запускает detector container с `baseline_v3` и печатает готовые команды
+для `ros2 topic echo`, `ros2 bag info` и `ros2 bag play`. Флаг `-Play` сразу
+запускает replay в том же окне; для демонстрации JSON-выхода удобнее оставить
+replay отдельной командой и параллельно открыть `topic echo`.
 
 ### Пошаговый запуск без плеера
 
@@ -207,12 +216,12 @@ docker exec -it lidar-detector /ros_entrypoint.sh `
 
 ```powershell
 docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag info /data
-docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 1.0 --read-ahead-queue-size 2
+docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 0.2 --read-ahead-queue-size 20
 ```
 
-`/ros_entrypoint.sh` подготавливает окружение ROS для каждой команды `docker exec`. `--read-ahead-queue-size 2` ограничивает предварительное чтение двумя сообщениями: полные облака этого bag велики, большой буфер требует много RAM и увеличивает ожидание старта. Это буфер чтения bag, не очередь детектора. Для просмотра в замедленном темпе можно поставить `--rate 0.2`; это не проверка производительности при исходной частоте. После конца bag можно повторить `ros2 bag play`, не перезапуская детектор.
+`/ros_entrypoint.sh` подготавливает окружение ROS для каждой команды `docker exec`. `--rate 0.2` и `--read-ahead-queue-size 20` выбраны как стабильный demo-режим на Windows/Docker bind mount; это не проверка производительности при исходной частоте. Для отдельной throughput-проверки можно поставить `--rate 1.0`, но тогда нужно фиксировать очереди, drops, starvation warnings, ресурсы и число полученных результатов. После конца bag можно повторить `ros2 bag play`, не перезапуская детектор.
 
-При проверке этого сценария на Windows/Docker получен JSON детектора; также наблюдалось предупреждение `Message queue starved` при чтении большого bag с bind mount. Оно означает задержки подачи сообщений: для такого запуска исходный темп не гарантирован. Для оценки производительности на стенде отдельно измеряются чтение, обработка и число полученных результатов.
+При проверке этого сценария на Windows/Docker получен JSON детектора. В режиме `--rate 1.0 --read-ahead-queue-size 2` наблюдалось предупреждение `Message queue starved` при чтении большого bag с bind mount. Оно означает задержки подачи сообщений: для такого запуска исходный темп не гарантирован. Для оценки производительности на стенде отдельно измеряются чтение, обработка и число полученных результатов.
 
 В окне результата появляются JSON-сообщения: `intrusion_candidate_present`, `nearest_reportable_intrusion_distance_from_source_origin_m`, `status`, `reason`, `source_frame`, `header_timestamp_ns`. `runtime_transport=ros2` и `noise_filter_mode=baseline_v3` подтверждают выбранный путь. Расстояние отсчитывается от начала координат исходного облака; отсутствие поддержанного результата даёт `UNKNOWN`/`null`, а не доказательство свободного пути. `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняют статус экспериментального candidate-only решения.
 
@@ -254,6 +263,8 @@ docker stop lidar-detector
 - [Описание решения для сдачи](SOLUTION.md).
 - [Быстрый запуск плеера для проверяющих](docs/README_REVIEWER_PLAYER_QUICKSTART.md).
 - [Чеклист сдачи и repo-gate](docs/README_SUBMISSION_CHECKLIST.md).
+- [Срез разрывов к критериям](docs/reports/submission/submission_gap_closure_20260927.md).
+- [Проверка headless ROS2 запуска](docs/reports/submission/headless_ros2_smoke_20260927.md).
 - [Методология и действующий контракт](docs/README_methodology.md).
 - [Короткая сводка модели и метрик](docs/README_noise_classifier.md).
 - [Актуальный baseline_v3 runtime pipeline](docs/README_noise_classifier_v3.md).
