@@ -261,6 +261,7 @@ docker stop lidar-detector
 
 ## Документация
 
+- [Описание решения для сдачи](SOLUTION.md).
 - [Быстрый запуск плеера для проверяющих](docs/README_REVIEWER_PLAYER_QUICKSTART.md).
 - [Чеклист сдачи и repo-gate](docs/README_SUBMISSION_CHECKLIST.md).
 - [Методология и действующий контракт](docs/README_methodology.md).
