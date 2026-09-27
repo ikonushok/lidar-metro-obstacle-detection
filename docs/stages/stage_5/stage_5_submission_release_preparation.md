@@ -89,16 +89,37 @@
     build context 1.39 MB; image
     `sha256:c4cf115060bd918c1ae7f6347b6afce37abfb4cb73d8cb9c408c54391f63dff1`,
     size 524563646 bytes.
+  - в сдачной копии
+    `scripts\prepare_hackathon_datasets.py --raw-dir ...\lidar_MosMetro3D\dataset\raw --catalog-dir ...\lidar-metro-obstacle-detection\dataset\for_hackathon`
+    — PASS; три архива подготовлены hardlink-ами.
+  - в сдачной копии
+    `scripts\run_stage_2_cpu_player.ps1 -Port 8101 ... -Image lidar-metro-obstacle-detection:submission -NoBrowser`
+    — PASS; контейнер поднял HTTP-плеер на `http://localhost:8101/`.
+  - `GET /datasets.json` — PASS; доступны 8 source IDs:
+    `new_data`, `roundT_doubleT`, `squareT_platform_squareT_switch`,
+    `doubleT_platform`, `roundT_squareT_pressureGate_squareT`,
+    `doubleT_obstacle`, `roundT_pressureGate_roundT`, `cloud_with_fake_obj`.
+  - `GET /api/cpu_sources/cloud_with_fake_obj/manifest.json` — PASS:
+    `frame_count=1510`, `runtime_transport=direct_cpp`,
+    `noise_filter_mode=candidate_baseline_v2`,
+    `rail_selection_method=development_candidate`.
+  - `GET /api/cpu_sources/doubleT_obstacle/13.json` — PASS:
+    `intrusion_candidate_present=true`,
+    `nearest_reportable_intrusion_distance_from_source_origin_m=55.568001`,
+    `runtime_transport=direct_cpp`,
+    `noise_filter_mode=candidate_baseline_v2`,
+    `system_status=UNKNOWN`,
+    `safety_decision_permitted=false`.
 - Validation level achieved: L1 для unit-тестов gate, чистого repo-gate и
-  Docker build; L0/L1 для полного соответствия ТЗ до ROS2 replay на данных.
-- Что не проверено: финальный Docker build, полный ROS2 replay, p95/p99,
-  drops/resources, открытие публичной ссылки из инкогнито, финальные видео и
-  презентация.
+  Docker build; L3 для direct-player smoke на локальных hardlink-датасетах;
+  L0/L1 для полного соответствия ТЗ до ROS2 replay на данных.
+- Что не проверено: полный ROS2 replay, p95/p99, drops/resources, открытие
+  публичной ссылки из инкогнито, финальные видео и презентация.
 - Известные FP/FN или safety-риски: качество детекции не менялось; прежние
   ограничения `UNKNOWN != CLEAR`, assumed geometry и отсутствие production
   safety сохраняются.
-- Следующий минимальный тест: выполнить player smoke и ROS2/headless replay на
-  подготовленном `dataset/extracted/doubleT_obstacle`, затем записать короткое
-  demo video / screenshots.
+- Следующий минимальный тест: выполнить ROS2/headless replay на подготовленном
+  `dataset/extracted/doubleT_obstacle`, затем записать короткое demo video /
+  screenshots.
 - Residual risk: gate защищает состав репозитория, но не доказывает runtime
   quality, real-time или соответствие скрытой проверке жюри.
