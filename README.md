@@ -128,7 +128,7 @@ $frame.result | Select-Object intrusion_candidate_present, reportable_core_count
 
 В manifest и JSON плеера должны быть `runtime_transport=direct_cpp`, `noise_filter_mode=baseline_v3`. Валидатор отдельно запускает ROS2 в тестовом контейнере и сверяет direct/ROS2 на одинаковом входе; самому плееру ROS2-транспорт не нужен. Для проверки нужны сохранённые XYZF и extracted bag `doubleT_obstacle`; это проверка интеграции, не независимого качества модели.
 
-Исторический явный `-RailSelectionMethod baseline` сохраняет ROS2-путь. Опция `-Measure` также отдельно измеряет ROS2-обработку окна; её результаты не являются задержками прямого плеера.
+Исторический явный `-RailSelectionMethod baseline` остаётся совместимым режимом launcher'а, но сдачный маршрут — `development_candidate` + direct C++ player и отдельный headless ROS2 wrapper. Отдельной опции измерения окна в launcher'е больше нет.
 
 Остановить плеер:
 
@@ -265,6 +265,7 @@ docker stop lidar-detector
 - [Чеклист сдачи и repo-gate](docs/SUBMISSION_CHECKLIST.md).
 - [Срез готовности к критериям](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
 - [Проверка headless ROS2 запуска](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md).
+- [Подготовка локальных файлов плеера](docs/PLAYER_SETUP.md).
 - [Методология и действующий контракт](docs/METHODOLOGY.md).
 - [История работ и текущий статус](docs/DEVELOPMENT_HISTORY_AND_STATUS.md).
 - [Датасеты, наблюдения и ограничения](docs/DATASETS_AND_ASSUMPTIONS.md).
@@ -281,12 +282,19 @@ scripts/      подготовка данных, запуск плеера, ROS2
 config/       контракты, параметры и development-аннотации
 models/       версионированная JSON-модель `baseline_v3_runtime_policy.json`; runtime использует C++ реализацию
 web/          HTTP-плеер
+tests/        regression-тесты контрактов, плеера и repo-gate
+assets/       изображения README/SOLUTION и схемы решения
 dataset/      локальные архивы/распаковки, ignored
 artefacts/    локальные результаты и assets, ignored
 docs/
+  REVIEWER_QUICKSTART.md
+  SUBMISSION_CHECKLIST.md
+  PLAYER_SETUP.md
   METHODOLOGY.md
   DEVELOPMENT_HISTORY_AND_STATUS.md
   DATASETS_AND_ASSUMPTIONS.md
+  TRAIN_ENVELOPE_AND_LIMITATIONS.md
+  LIDAR_SPEC.md
   reports/submission/    сдачные отчёты проверки
   hackathon_documentations/instruction.md
 ```
