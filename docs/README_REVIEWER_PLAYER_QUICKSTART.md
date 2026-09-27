@@ -70,7 +70,7 @@ roundT_pressureGate_roundT
 cloud_with_fake_obj              # synthetic/fake obstacles от организаторов
 ```
 
-Собственные synthetic-артефакты проекта сейчас являются development/evaluation-данными в `artefacts/stage_5/synthetic_obstacles` и не являются отдельным source в браузерном catalog. Метод и ограничения описаны в [docs/README_synthetic_obstacles.md](README_synthetic_obstacles.md).
+Собственные synthetic-артефакты проекта не входят в публичную сдачу и не являются отдельным source в браузерном catalog.
 
 ## 5. Быстрая проверка API
 

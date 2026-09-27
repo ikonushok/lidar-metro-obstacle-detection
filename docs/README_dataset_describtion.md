@@ -112,4 +112,4 @@
 
 В локальном рабочем окружении на момент описанного исследования были распакованы копии трёх сцен из `for_hackathon`: `doubleT_obstacle`, `roundT_doubleT` и `squareT_platform_squareT_switch`, а также `cloud_with_fake_obj`. Они распакованы только для прямого чтения `.db3` через ROS 2; исходниками остаются архивы в `dataset/for_hackathon/`.
 
-Источник чисел: [первичный аудит](README_dataset_audit.md) и [аудит дальностей](stages/stage_5/stage_5_source_distance_audit.md).
+Источник чисел: [первичный аудит](README_dataset_audit.md) и локальный аудит дальностей, внутренний журнал которого не входит в публичную сдачу.

@@ -239,8 +239,8 @@ sha256:c4cf115060bd918c1ae7f6347b6afce37abfb4cb73d8cb9c408c54391f63dff1
 `Message queue starved`. Поэтому этот прогон подтверждает интерфейс и
 завершение обработки, но не доказывает real-time throughput.
 
-Подробный журнал проверок:
-`docs/stages/stage_5/stage_5_submission_release_preparation.md`.
+Эти проверки подтверждают воспроизводимость интерфейсов сдачного среза, но не
+заменяют скрытую проверку жюри на новых данных.
 
 ## 9. Ограничения
 
@@ -271,7 +271,6 @@ models/noise_classifier_candidate_baseline_v2.json
 web/
 docs/README_REVIEWER_PLAYER_QUICKSTART.md
 docs/README_SUBMISSION_CHECKLIST.md
-docs/stages/stage_5/stage_5_submission_release_preparation.md
 ```
 
 ## 11. Вывод

@@ -6,7 +6,7 @@ schema_version: 1
 contract:
   status: ASSUMED_HACKATHON
   scope: OFFLINE_NEW_DATA_DEVELOPMENT_ONLY
-  source_document: docs/stages/stage_3/stage_3_new_data_transfer_plan.md
+  source_document: internal_development_note_removed_from_submission
   source_revision: 2026-09-20
   production_revalidation_required: true
   replacement_evidence_required: [primary_frame_and_units_specification, target_from_lidar_calibration, approved_train_profile_and_dynamic_clearance, approved_path_and_safety_margin]

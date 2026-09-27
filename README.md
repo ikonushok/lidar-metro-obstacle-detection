@@ -13,7 +13,7 @@
 | Исследование записей | Архив bag → XYZ → прямой C++ → JSON → HTTP-плеер | Да, для просмотра |
 | Проверка заказчиком / сдача | ROS2 PointCloud2 → C++ node → ROS2 String с JSON | Нет |
 
-Интеграционные проверки сохранены в [отчёте direct player](docs/stages/stage_5/stage_5_direct_player_run.md). Это ограниченные проверки интерфейсов, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
+Интеграционные проверки покрывают direct player и headless ROS2 replay на локально подготовленных данных. Это ограниченные проверки интерфейсов, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
 
 Среда сдачи по [ТЗ](docs/hackathon_documentations/5.%20ДепТранспорта.pdf): **Ubuntu 22.04 + ROS 2 Humble + Docker**. Проект подготовлен для [«Лидеров цифровой трансформации»](https://i.moscow/cabinet/hackaton/lct/contest/1233bb5506bc455f86d534b3b40171f1).
 
@@ -99,28 +99,6 @@ docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
 
 Откройте [http://localhost:8100/](http://localhost:8100/), выберите датасет и нажмите **▶ Запуск**. Плеер получает облако и соответствующий JSON от C++; в режиме `candidate_baseline_v2` использует готовые индексы препятствия/шума и геометрию. `CORE` до модели может содержать инфраструктуру; отрицательный результат модели и `UNKNOWN` не означают подтверждённый свободный путь.
 
-Для визуальной проверки лучшей offline-модели из
-[README_noise_classifier_v2.md](docs/README_noise_classifier_v2.md)
-используется отдельный образ `stage-4-cpu-viewer-v2-best`. Он не заменяет
-обычную runtime-модель в `models/`, а встраивает v2-best JSON только в этот
-viewer-образ:
-
-```powershell
-docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
-.\scripts\run_stage_2_cpu_player.ps1 `
-  -Port 8100 `
-  -RailForwardMinM 2 `
-  -ForwardExtensionMethod tangent `
-  -NoiseFilterMode candidate_baseline_v2 `
-  -Image lidar-mosmetro3d:stage-4-cpu-viewer-v2-best `
-  -Dockerfile Dockerfile.v2-best-cpu-viewer `
-  -RebuildImage
-```
-
-После пересборки откройте
-[http://localhost:8100/?dataset=doubleT_obstacle&v=generic-backend-filter-1](http://localhost:8100/?dataset=doubleT_obstacle&v=generic-backend-filter-1)
-и сделайте `Ctrl+F5`, если страница уже была открыта.
-
 Проверить выбранный режим и один результат:
 
 ```powershell
@@ -160,7 +138,7 @@ ros2 bag play → PointCloud2 → C++ ROS2-узел
 
 Оба входа используют общее C++-ядро и существующую обученную модель `ApplyCandidateBaselineV2`. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=candidate_baseline_v2`.
 
-Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. [Спецификация](docs/stages/stage_5/stage_5_direct_player.md) и [результаты проверки](docs/stages/stage_5/stage_5_direct_player_run.md).
+Текущее разделение оставляет плеер средством просмотра, а ROS2 node — сдачным headless-входом для `ros2 bag play`.
 
 ### Пошаговый запуск без плеера
 
@@ -250,14 +228,14 @@ docker stop lidar-detector
 
 В текущий запуск не входят CUDA, arc-варианты, deskew, карта, tracking и TTC. `arc_limited` остаётся явным экспериментальным player-режимом; `arc_clamped` доступен только в низкоуровневых C++/ROS2 экспериментах. Их наличие не меняет выбранный `tangent`. Качество и скорость оцениваются раздельно; [результаты измерений](docs/README_noise_classifier.md#время-и-соответствие-тз) указывают версию и область замера. Прямой транспорт не исключает ожидание чтения архива, lock или C++ обработки.
 
-Это хакатонный прототип, не сертифицированная система управления торможением. В разработке находятся генератор синтетических препятствий и фильтр ложных срабатываний; затем планируется обучение на синтетике и, при необходимости, сравнение ML-моделей. Проверки финальной версии, фиксация результатов и видео выполняются после выбранной доработки. [План работ и задачи перед сдачей](docs/README_work_plan.md).
+Это хакатонный прототип, не сертифицированная система управления торможением. Он сдаётся как актуальный `candidate_baseline_v2` pipeline с явно указанными ограничениями качества, калибровки и real-time throughput.
 
 ## Среда разработки
 
 - Dockerfile использует `ros:humble-ros-base-jammy`; системные Python/ROS-зависимости устанавливаются APT, C++ пакет собирается colcon.
 - [`.python-version`](.python-version) содержит `3.10`. Локальная Windows `.venv` — отдельная среда; на этой машине её конфигурация указывает Python 3.12.10. Смена локального Python не требуется для запуска контейнера.
 - [`requirements.txt`](requirements.txt) перечисляет NumPy и Matplotlib; ROS2/rclpy/messages поставляются образом, а исследовательские scripts могут требовать дополнительные системные или локальные зависимости. Этот файл не является полным установщиком ROS-окружения.
-- CPU — основной путь. Сведения о [GPU стенде организатора](docs/stages/stage_3/stage_3_organizer_gpu_environment_run.md) не заменяют проверку GPU Docker runtime или замер на самом стенде.
+- CPU — основной путь. CUDA и GPU-ускорение не входят в сдачный сценарий.
 
 ## Документация
 
@@ -281,12 +259,7 @@ dataset/      локальные архивы/распаковки, ignored
 artefacts/    локальные результаты и assets, ignored
 docs/
   README_methodology.md
-  README_work_plan.md
   README_dataset_audit.md
-  stages/     спецификации и отчёты stage_N/stage_N_<purpose>.md
-  reports/    датированные аудиты по категориям
-  tasks/      исторические task specs
-agents/       роли и проверочные чек-листы
 ```
 
 ## Лицензия

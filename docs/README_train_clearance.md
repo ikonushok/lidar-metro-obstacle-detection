@@ -50,4 +50,4 @@ Raw CORE сохраняется отдельно от reportable после mode
 
 Справочный прямоугольник в YAML задан в условной системе `RAIL_CENTERLINE_REFERENCE`: горизонтально от -1.400 до +1.400 м относительно оси пути, вертикально от 0 до 3.700 м относительно уровня головки рельса. Это **не** система координат лидара и не разрешение использовать габарит для `CLEAR` или оценки расстояния.
 
-Поля и статус такого контура хранятся в [`config/geometry_contract.yaml`](../config/geometry_contract.yaml). Правило его активации описано в [отчёте этапа 2](stages/stage_2/stage_2_geometry_config.md).
+Поля и статус такого контура хранятся в [`config/geometry_contract.yaml`](../config/geometry_contract.yaml).

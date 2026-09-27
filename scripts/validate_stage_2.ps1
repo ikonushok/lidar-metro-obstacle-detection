@@ -19,4 +19,4 @@ if ($LASTEXITCODE -ne 0) { throw "Docker build failed (exit $LASTEXITCODE)" }
 if ($LASTEXITCODE -ne 0) { throw "Stage 2 inspection failed (exit $LASTEXITCODE)" }
 
 Write-Output "Player data prepared in $artefactRoot. Run ./scripts/run_stage_2_player.ps1 to open it locally."
-Write-Output "Record observations in docs/stages/stage_2/stage_2_event_registry.md."
+Write-Output "Record submission-facing observations in SOLUTION.md or docs/README_SUBMISSION_CHECKLIST.md."

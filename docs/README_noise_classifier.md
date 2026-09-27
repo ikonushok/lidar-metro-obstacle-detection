@@ -169,7 +169,7 @@ runtime, потому что его тяжелее переносить и пр�
 
 ТЗ, §8.3, не задаёт числовой предел задержки: оцениваются задержка, частота кадров, ресурсы и стабильность в реальном времени. Около 100 мс на кадр - инженерный ориентир для входа ~10 Гц, а не формальный порог ТЗ. Текущий lean stream p95 `51,4` мс на первых 5 минутах `new_data` показывает, что вычислительное C++ ядро с `candidate_baseline_v2` имеет запас относительно этого ориентира на данном окне. Однако этот замер не включает ROS2/HTTP/UI/drops и выполнялся не как чистый стендовый replay; поэтому соответствие требованиям по скорости полного решения **ещё не подтверждено**. Перед финальным выводом нужен ROS2 replay с очередью и пропущенными кадрами на целевом стенде Ubuntu 22.04 + ROS 2 Humble + Docker.
 
-Полный offline-прогон семи записей: `artefacts/stage_5/noise_model_eval_current/*.json`. Исторический lean timing после фикса: `artefacts/stage_5/noise_model_lean_timing_timing_fix_new_data_5min/new_data.json`. Lean timing после voxel index для связных `CORE`-компонент: `artefacts/stage_5/noise_model_lean_timing_spatial_new_data_5min/new_data.json`. Текущий lean timing `candidate_baseline_v2`: `artefacts/stage_5/noise_model_lean_timing_candidate_baseline_v2_new_data_5min/new_data.json`. Исходный исторический отчёт сохранён в [stage_5_noise_model_all_datasets_eval.md](stages/stage_5/stage_5_noise_model_all_datasets_eval.md).
+Полный offline-прогон семи записей и lean timing хранились как локальные артефакты разработки в `artefacts/`; в публичную сдачу они не включаются, чтобы репозиторий содержал только актуальный код, модель и инструкции запуска.
 
 ## Следующие проверки
 
