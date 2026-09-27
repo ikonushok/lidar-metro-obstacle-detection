@@ -79,11 +79,17 @@ struct AnalysisResult {
   std::size_t core_count = 0;
   std::size_t reportable_core_count = 0;
   std::size_t ignored_noise_count = 0;
+  std::size_t baseline_v3_geometry_obstacle_count = 0;
+  std::size_t baseline_v3_boundary_warning_count = 0;
+  std::size_t baseline_v3_model_assist_count = 0;
   std::size_t margin_count = 0;
   std::size_t outside_reference_count = 0;
   std::size_t unknown_count = 0;
   std::vector<std::size_t> reportable_core_source_indices;
   std::vector<std::size_t> ignored_noise_source_indices;
+  std::vector<std::size_t> baseline_v3_geometry_obstacle_source_indices;
+  std::vector<std::size_t> baseline_v3_boundary_warning_source_indices;
+  std::vector<std::size_t> baseline_v3_model_assist_source_indices;
   NearestPoint nearest_core;
   NearestPoint nearest_reportable_core;
   NearestPoint nearest_margin;
@@ -154,6 +160,11 @@ void ApplyCandidateBaselineV2(const float* xyz, std::size_t point_count,
                               AnalysisResult& result,
                               double connectivity_radius_m = 0.25,
                               FrozenNoiseTreeV1Profile* profile = nullptr);
+
+void ApplyBaselineV3(const float* xyz, std::size_t point_count,
+                     AnalysisResult& result,
+                     double connectivity_radius_m = 0.25,
+                     FrozenNoiseTreeV1Profile* profile = nullptr);
 
 // Returns the twelve edges of each finite segment prism in source coordinates.
 // The prism basis is shared with AnalyzeCurveEnvelope; the viewer must draw

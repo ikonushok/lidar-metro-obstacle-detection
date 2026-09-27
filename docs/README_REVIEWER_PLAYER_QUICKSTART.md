@@ -53,7 +53,7 @@ docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
   -RailSelectionMethod development_candidate `
   -RailForwardMinM 2 `
   -ForwardExtensionMethod tangent `
-  -NoiseFilterMode candidate_baseline_v2 `
+  -NoiseFilterMode baseline_v3 `
   -RebuildImage
 ```
 
@@ -70,7 +70,9 @@ roundT_pressureGate_roundT
 cloud_with_fake_obj              # synthetic/fake obstacles от организаторов
 ```
 
-Собственные synthetic-артефакты проекта не входят в публичную сдачу и не являются отдельным source в браузерном catalog.
+Собственные synthetic-артефакты проекта используются только как
+development/evaluation-данные и не являются отдельным source в браузерном
+catalog.
 
 ## 5. Быстрая проверка API
 
@@ -81,7 +83,7 @@ $manifest = Invoke-RestMethod 'http://localhost:8100/api/cpu_sources/cloud_with_
 $manifest | Select-Object dataset_id,frame_count,runtime_transport,noise_filter_mode
 ```
 
-Ожидается `runtime_transport=direct_cpp` и `noise_filter_mode=candidate_baseline_v2`.
+Ожидается `runtime_transport=direct_cpp` и `noise_filter_mode=baseline_v3`.
 
 ## 6. Проверка репозитория перед сдачей
 

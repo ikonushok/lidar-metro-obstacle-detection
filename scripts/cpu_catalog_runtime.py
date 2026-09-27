@@ -45,10 +45,10 @@ class CpuCatalogRuntime:
                  rail_forward_max_m=80.0, rail_station_length_m=2.0, rail_cell_width_m=0.04,
                  forward_extension_method='tangent', arc_extension_horizon_m=0.0,
                  min_arc_radius_m=60.0, max_arc_turn_deg=8.0, arc_fit_window_pairs=5,
-                 noise_filter_mode='candidate_baseline_v2'):
+                 noise_filter_mode='baseline_v3'):
         if rail_selection_method not in {'baseline', 'development_candidate'}:
             raise ValueError('unsupported rail selection method')
-        if noise_filter_mode not in {'legacy', 'candidate_baseline_v2'}:
+        if noise_filter_mode not in {'legacy', 'candidate_baseline_v2', 'baseline_v3'}:
             raise ValueError('unsupported noise filter mode')
         self.noise_filter_mode = noise_filter_mode
         self.runtime_transport = 'ros2'
@@ -193,7 +193,7 @@ class DirectDetailedCpuRuntime:
                  rail_forward_max_m=80.0, rail_station_length_m=2.0, rail_cell_width_m=0.04,
                  forward_extension_method='tangent', arc_extension_horizon_m=0.0,
                  min_arc_radius_m=60.0, max_arc_turn_deg=8.0, arc_fit_window_pairs=5,
-                 noise_filter_mode='candidate_baseline_v2'):
+                 noise_filter_mode='baseline_v3'):
         if rail_selection_method != 'development_candidate':
             raise ValueError('direct stream supports development_candidate only')
         if rail_forward_max_m != 80.0 or rail_station_length_m != 2.0 or rail_cell_width_m != 0.04:
@@ -206,7 +206,7 @@ class DirectDetailedCpuRuntime:
             raise ValueError('arc extension parameters must be finite and nonnegative/positive')
         if not isinstance(arc_fit_window_pairs, int) or arc_fit_window_pairs < 3:
             raise ValueError('arc fit window must be an integer >= 3')
-        if noise_filter_mode not in {'legacy', 'candidate_baseline_v2'}:
+        if noise_filter_mode not in {'legacy', 'candidate_baseline_v2', 'baseline_v3'}:
             raise ValueError('unsupported noise filter mode')
         self.rail_selection_method = rail_selection_method
         self.rail_search_config = {
@@ -236,6 +236,8 @@ class DirectDetailedCpuRuntime:
             command.extend(['--arc-fit-window', str(int(arc_fit_window_pairs))])
         if noise_filter_mode == 'candidate_baseline_v2':
             command.append('--use-model-filter')
+        elif noise_filter_mode == 'baseline_v3':
+            command.append('--use-baseline-v3-filter')
         self.process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

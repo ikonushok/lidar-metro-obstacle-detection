@@ -30,7 +30,6 @@ SOURCES = (
      'cloud_with_fake_obj', 'dataset/for_hackathon/cloud_with_fake_obj'),
 )
 
-
 class StaleFrameRequest(Exception):
     """Raised when a newer frame request supersedes the current one."""
 
@@ -92,7 +91,8 @@ def serve(root: Path, port: int, rail_selection_method: str, rail_forward_min_m:
             'runtime_transport': runtime.runtime_transport,
             'rail_search_config': runtime.rail_search_config,
             'forward_extension_config': runtime.forward_extension_config,
-            'noise_filter_mode': runtime.noise_filter_mode,
+            'noise_filter_mode': noise_filter_mode,
+            'runtime_noise_filter_mode': runtime.noise_filter_mode,
             'playback_timing': 'SOURCE_BAG_TIMING_PLUS_LAZY_CPU_PROCESSING',
             'frames': [{'index': index, 'source_index': index,
                         'metadata_url': f'/api/cpu_sources/{source_id}/{index}.json'}
@@ -234,8 +234,8 @@ if __name__ == '__main__':
     parser.add_argument('--min-arc-radius-m', type=float, default=60.0)
     parser.add_argument('--max-arc-turn-deg', type=float, default=8.0)
     parser.add_argument('--arc-fit-window-pairs', type=int, default=5)
-    parser.add_argument('--noise-filter-mode', choices=('legacy', 'candidate_baseline_v2'),
-                        default='candidate_baseline_v2')
+    parser.add_argument('--noise-filter-mode', choices=('legacy', 'candidate_baseline_v2', 'baseline_v3'),
+                        default='baseline_v3')
     args = parser.parse_args()
     serve(args.root, args.port, args.rail_selection_method, args.rail_forward_min_m,
           args.forward_extension_method, args.arc_extension_horizon_m,

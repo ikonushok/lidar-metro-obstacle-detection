@@ -19,8 +19,8 @@ param(
     [double]$MaxArcTurnDeg = 8.0,
     [ValidateRange(3, 50)]
     [int]$ArcFitWindowPairs = 5,
-    [ValidateSet('legacy', 'candidate_baseline_v2')]
-    [string]$NoiseFilterMode = 'candidate_baseline_v2',
+    [ValidateSet('legacy', 'candidate_baseline_v2', 'baseline_v3')]
+    [string]$NoiseFilterMode = 'baseline_v3',
     [string]$Image = 'lidar-mosmetro3d:stage-4-cpu-viewer',
     [string]$Dockerfile = '',
     [ValidateRange(0, 1000000)]
