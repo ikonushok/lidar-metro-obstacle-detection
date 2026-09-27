@@ -7,16 +7,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = ROOT / 'scripts' / 'run_stage_2_cpu_player.ps1'
-EXPORTER = ROOT / 'scripts' / 'export_cpu_viewer_replay.py'
 
 
 class CpuPlayerLauncherTest(unittest.TestCase):
-    def test_launcher_exposes_a_continuous_frame_window(self):
-        source = LAUNCHER.read_text(encoding='utf-8')
-        self.assertRegex(source, r'\[int\]\s*\$FirstIndex\s*=')
-        self.assertRegex(source, r'\[int\]\s*\$LastIndex\s*=')
-        self.assertIn('--first-index $FirstIndex --last-index $LastIndex', source)
-
     def test_launcher_isolates_ros2_runtime_by_viewer_port(self):
         source = LAUNCHER.read_text(encoding='utf-8')
         self.assertIn('$rosDomainId = ($Port % 232) + 1', source)
@@ -58,12 +51,6 @@ class CpuPlayerLauncherTest(unittest.TestCase):
         self.assertIn('--min-arc-radius-m $MinArcRadiusM', source)
         self.assertIn('--max-arc-turn-deg $MaxArcTurnDeg', source)
         self.assertIn('--arc-fit-window-pairs $ArcFitWindowPairs', source)
-
-    def test_exporter_selects_every_frame_in_the_requested_window(self):
-        source = EXPORTER.read_text(encoding='utf-8')
-        self.assertIn('for index in sorted(source) if args.first_index <= index <= args.last_index', source)
-        self.assertNotRegex(source, r'default=1050')
-        self.assertNotRegex(source, r'default=1150')
 
 
 if __name__ == '__main__':

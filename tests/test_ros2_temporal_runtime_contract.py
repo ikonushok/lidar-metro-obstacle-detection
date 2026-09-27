@@ -6,6 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NODE = ROOT / "src/lidar_mosmetro3d_cpp/src/curve_envelope_node.cpp"
 CHECKER = ROOT / "scripts/check_ros_model_pipeline.py"
+WRAPPER = ROOT / "scripts/run_submission_ros2_demo.ps1"
 
 
 class Ros2TemporalRuntimeContractTest(unittest.TestCase):
@@ -45,6 +46,30 @@ class Ros2TemporalRuntimeContractTest(unittest.TestCase):
         fields = ast.literal_eval(parity.value)
         self.assertNotIn("intrusion_candidate_present", fields)
         self.assertNotIn("reportable_intrusion_candidate_present", fields)
+
+    def test_ros2_checker_exercises_foreign_bag_failure_modes(self):
+        source = CHECKER.read_text(encoding="utf-8")
+
+        self.assertIn("UNSUPPORTED_POINTCLOUD_XYZ_SCHEMA", source)
+        self.assertIn("UNSUPPORTED_SOURCE_FRAME", source)
+        self.assertIn("original_pointcloud_point_step", source)
+        self.assertIn("point_view(original)", source)
+        self.assertIn("valid_indices", source)
+        self.assertIn("source_switch", source)
+
+    def test_submission_wrapper_accepts_customer_bag_topic_and_frame(self):
+        source = WRAPPER.read_text(encoding="utf-8")
+
+        self.assertIn("[string]$BagPath = ''", source)
+        self.assertIn("[string]$InputTopic = '/sensing/lidar/hesai128/pointcloud'", source)
+        self.assertIn("[string]$SourceFrame = 'lidar_livox'", source)
+        self.assertIn("metadata.yaml", source)
+        self.assertIn("BagPath must point to an extracted ROS2 bag directory", source)
+        self.assertIn("-p input_topic:=$InputTopic", source)
+        self.assertIn("-p source_frame:=$SourceFrame", source)
+        self.assertIn("-p output_topic:=$OutputTopic", source)
+        self.assertIn("ros2 bag info /data", source)
+        self.assertIn("ros2 bag play /data --rate $Rate --read-ahead-queue-size $ReadAheadQueueSize", source)
 
 
 if __name__ == "__main__":

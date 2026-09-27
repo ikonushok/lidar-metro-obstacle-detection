@@ -1,9 +1,20 @@
 import tarfile
 import tempfile
 import unittest
+import importlib.util
 from pathlib import Path
 
-from prepare_hackathon_datasets import extract_bag, materialize_archive
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location(
+    "prepare_hackathon_datasets",
+    ROOT / "scripts" / "prepare_hackathon_datasets.py",
+)
+prepare_hackathon_datasets = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(prepare_hackathon_datasets)
+
+extract_bag = prepare_hackathon_datasets.extract_bag
+materialize_archive = prepare_hackathon_datasets.materialize_archive
 
 
 def write_tar(path: Path, files: dict[str, bytes]) -> None:

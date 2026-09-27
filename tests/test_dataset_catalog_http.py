@@ -4,7 +4,7 @@ import json
 import math
 import unittest
 from urllib.request import urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 BASE = 'http://localhost:8080'
 
@@ -16,6 +16,15 @@ def metadata(path):
     return json.loads(read(path))
 
 class DatasetCatalogTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        try:
+            read('/datasets.json')
+        except URLError as error:
+            raise unittest.SkipTest(
+                f'local dataset catalog is not running at {BASE}: {error}'
+            )
+
     def test_catalog_identity_and_geometry_isolation(self):
         catalog = {item['id']: item for item in metadata('/datasets.json')}
         self.assertIn('doubleT_obstacle', catalog)
