@@ -1,0 +1,17 @@
+{
+  "classification": "FIX_PROVEN",
+  "date": "2026-09-20",
+  "bug": "Object-candidate distance sprites obscure the point-cloud view",
+  "reproduction": {
+    "command": "node --test tests/test_review_layers.cjs",
+    "before": {"exit_code": 1, "assertion": "object-candidate layer leaves the point-cloud view free of distance sprites"},
+    "after": {"exit_code": 0, "passed": 8}
+  },
+  "broader_validation": {
+    "command": "node --test tests/test_player_layout.cjs tests/test_player_playback.cjs tests/test_review_layers.cjs tests/test_raw_player.cjs",
+    "exit_code": 0,
+    "passed": 15
+  },
+  "browser_check": "Reloaded localhost player with object-candidate layer enabled; the canvas no longer exposes distance-label text in its accessible state.",
+  "validation_level": "L2 static and browser smoke; no safety-performance claim"
+}

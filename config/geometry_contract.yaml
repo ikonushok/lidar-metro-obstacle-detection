@@ -1,0 +1,260 @@
+# Geometry contract for the envelope-only baseline.
+# The active profile below is a project-approved HACKATHON assumption, not an
+# operational calibration. It may produce an obstacle candidate for the demo,
+# but never CLEAR/NO_OBSTACLE or a safety decision. Production requires a new
+# VERIFIED contract from primary calibration/profile sources.
+
+schema_version: 1
+
+contract:
+  status: ASSUMED_HACKATHON
+  scope: HACKATHON_DEMO_ONLY
+  source_document: PROJECT_ASSUMPTION_FROM_STAGE_2_VISUAL_REVIEW
+  source_revision: 2026-09-18
+  approved_by: PROJECT_TEAM
+  approved_at_utc: 2026-09-18
+  production_revalidation_required: true
+  replacement_evidence_required:
+    - primary_frame_and_units_specification
+    - target_from_lidar_calibration
+    - approved_train_profile_and_dynamic_clearance
+    - approved_path_and_safety_margin
+
+frames:
+  status: ASSUMED_HACKATHON
+  observed_source_frames:
+    - lidar_livox
+    - hesai_lidar
+  working_frame: hackathon_track_lidar_livox
+  target_from_source: hackathon_track_lidar_livox <- lidar_livox
+  source_frame_policy:
+    lidar_livox: ASSUMED_HACKATHON_ACTIVE
+    hesai_lidar: UNKNOWN_REQUIRES_SEPARATE_DEMO_PROFILE
+  axis_directions:
+    x: LATERAL_RIGHT_FACING_FORWARD_ASSUMED
+    y: LONGITUDINAL_FORWARD_IS_NEGATIVE_Y_ASSUMED
+    z: VERTICAL_UP_ASSUMED
+  units: m
+  units_status: ASSUMED_HACKATHON
+  lidar_mounting_extrinsics:
+    status: ASSUMED_HACKATHON
+    transform_direction: target <- lidar
+    target_frame: hackathon_track_lidar_livox
+    source_frame: lidar_livox
+    transform:
+      translation_m: [0.0, 0.0, 0.0]
+      rotation_xyzw: [0.0, 0.0, 0.0, 1.0]
+    assumption: lidar_origin_coincides_with_track_centerline_at_rail_head
+
+timing:
+  bag_header_clock_relation: UNCONFIRMED
+  per_point_clock_relation: UNCONFIRMED
+  deskew_enabled: false
+
+train_profile:
+  status: ASSUMED_HACKATHON
+  intended_scope: ALL_MOSCOW_METRO_ROLLING_STOCK
+  selection_mode: UNIVERSAL_FLEET_ENVELOPE_DEFAULT
+  individual_profile_override: ALLOWED_AFTER_VALIDATION
+  source_document: docs/README_train_clearance.md#справочные-размеры-вагонов
+  polygon_in_working_frame:
+    coordinate_system: hackathon_track_lidar_livox
+    units: m
+    units_status: ASSUMED_HACKATHON
+    lateral_extent_m: [-1.4, 1.4]
+    vertical_extent_m: [0.0, 3.7]
+    shape: AXIS_ALIGNED_OUTER_RECTANGLE_ASSUMED
+  reference_point: rail_centerline_at_rail_head_assumed
+  fleet_catalog: []
+
+universal_fleet_envelope:
+  status: ASSUMED_HACKATHON
+  composition: PROJECT_ASSUMED_OUTER_RECTANGLE_FOR_ALL_FLEET_DEMO
+  current_pipeline_strategy: UNIVERSAL_FLEET_ENVELOPE
+  source_document: docs/README_train_clearance.md#справочные-размеры-вагонов
+  polygon_in_working_frame:
+    coordinate_system: hackathon_track_lidar_livox
+    units: m
+    units_status: ASSUMED_HACKATHON
+    lateral_extent_m: [-1.4, 1.4]
+    vertical_extent_m: [0.0, 3.7]
+    shape: AXIS_ALIGNED_OUTER_RECTANGLE_ASSUMED
+  reference_point: rail_centerline_at_rail_head_assumed
+  body_outline: null
+  underframe_outline: null
+  curve_sweep: null
+  dynamic_displacements: null
+  reference_cross_section:
+    status: REFERENCE_ONLY
+    coordinate_system: RAIL_CENTERLINE_REFERENCE
+    units: m
+    origin: rail_centerline_at_rail_head
+    lateral_extent_m:
+      min: -1.400
+      max: 1.400
+    vertical_extent_above_rail_m:
+      min: 0.000
+      max: 3.700
+    shape: AXIS_ALIGNED_OUTER_RECTANGLE
+  reference_sources:
+    - docs/README_train_clearance.md
+  safety_decision_permitted: false
+
+visualization_overlay:
+  status: UNCONFIRMED
+  enabled: true
+  purpose: MANUAL_VISUAL_REVIEW_ONLY
+  source_axis_assumption:
+    longitudinal_axis: y
+    longitudinal_sign: -1
+    lateral_axis: x
+    vertical_axis: z
+    source_units: m
+  placement_in_source_coordinates:
+    forward_start_m: 0.000
+    forward_end_m: 200.000
+    track_centerline_lateral_m: 0.000
+    rail_head_vertical_m: 0.000
+  safety_decision_permitted: false
+
+path:
+  status: ASSUMED_HACKATHON
+  source_document: PROJECT_ASSUMPTION_FROM_STAGE_2_VISUAL_REVIEW
+  representation: AUTO_LOCAL_TRACK_POLYLINE_WITH_STRAIGHT_FALLBACK_NEGATIVE_Y
+  rail_centerline_in_working_frame:
+    x_m: 0.0
+    z_m: 0.0
+    forward_axis: -y
+    valid_forward_range_m: [0.0, 200.0]
+  lidar_pose_along_path:
+    position_m: [0.0, 0.0, 0.0]
+    orientation_xyzw: [0.0, 0.0, 0.0, 1.0]
+    assumption: coincides_with_track_frame_origin
+
+auto_grade_path:
+  status: ASSUMED_HACKATHON
+  enabled: true
+  purpose: CANDIDATE_ONLY_AUTO_VERTICAL_PATH_HYPOTHESIS
+  source_document: PROJECT_ASSUMPTION_FROM_STAGE_3_VISUAL_REVIEW
+  source_revision: 2026-09-18
+  estimation:
+    support_surface: FLOOR_UNDER_RAILS_ASSUMED
+    lateral_window_m: [-1.8, 1.8]
+    fit_forward_range_m: [0.0, 60.0]
+    bin_size_m: 10.0
+    floor_support_quantile_z: 0.10
+    min_points_per_bin: 200
+    min_valid_bins: 4
+    max_abs_grade: 0.10
+    max_fit_residual_m: 0.40
+  fallback:
+    mode: UNION_WITH_STRAIGHT_ENVELOPE
+    when_estimate_unavailable: STRAIGHT_ENVELOPE_CANDIDATES_ONLY_NO_CLEAR
+  safety_decision_permitted: false
+
+auto_track_path:
+  status: ASSUMED_HACKATHON
+  enabled: true
+  purpose: CANDIDATE_ONLY_LOCAL_3D_TRACK_PATH_HYPOTHESIS
+  source_document: PROJECT_ASSUMPTION_FROM_STAGE_3_VISUAL_REVIEW
+  source_revision: 2026-09-18
+  estimation:
+    support_surface: FLOOR_UNDER_RAILS_ASSUMED
+    fit_forward_range_m: [0.0, 200.0]
+    bin_size_m: 10.0
+    initial_lateral_center_m: 0.0
+    lateral_search_half_width_m: 3.5
+    floor_support_quantile_z: 0.10
+    floor_band_above_quantile_m: 0.35
+    min_points_per_bin: 60
+    min_valid_bins: 4
+    max_lateral_step_m: 1.50
+    max_abs_grade: 0.10
+  fallback:
+    mode: UNION_WITH_AUTO_GRADE_AND_STRAIGHT_ENVELOPE
+    when_estimate_unavailable: AUTO_GRADE_OR_STRAIGHT_CANDIDATES_ONLY_NO_CLEAR
+  safety_decision_permitted: false
+
+safety_envelope:
+  status: ASSUMED_HACKATHON
+  margin: 0.20
+  margin_unit: m
+  margin_unit_status: ASSUMED_HACKATHON
+  source_document: PROJECT_ASSUMPTION_FOR_HACKATHON_DEMO
+  intrusion_rule: INCLUSIVE_INTERSECTION_WITH_ASSUMED_PROFILE_EXPANDED_BY_MARGIN
+
+warning_layer:
+  status: ASSUMED_HACKATHON
+  source_document: PROJECT_ASSUMPTION_FROM_VISUAL_STAGE_2_REVIEW
+  purpose: EARLY_DEMO_WARNING_OUTSIDE_ASSUMED_TRAIN_PROFILE
+  offsets_from_profile_m:
+    left: 0.50
+    right: 0.50
+    top: 0.50
+    bottom: 1.30
+  result: WARNING_CANDIDATE_ASSUMED_GEOMETRY
+  safety_decision_permitted: false
+
+detection:
+  status: ASSUMED_HACKATHON
+  mode: ENVELOPE_ONLY_VOXEL_COMPONENTS
+  source_document: PROJECT_ASSUMPTION_FOR_HACKATHON_DEMO
+  roi:
+    forward_min_m: 0.0
+    forward_max_m: 200.0
+  clustering:
+    voxel_size_m: 0.25
+    min_cluster_points: 5
+    connectivity: 26
+  numeric_boundary_tolerance_m: 0.000001
+  protrusion_segmentation:
+    enabled: true
+    status: ASSUMED_HACKATHON
+    purpose: ADDITIONAL_ABOVE_FLOOR_COMPONENTS_NO_BASELINE_SUPPRESSION
+    min_height_above_floor_m: 0.35
+    max_height_above_floor_m: 2.8
+    voxel_size_m: 0.20
+    min_points: 5
+    max_horizontal_extent_m: 3.0
+  excluded_processing:
+    - background_subtraction
+    - ground_or_rail_removal
+    - deskew
+    - temporal_confirmation
+
+evaluation_ground_truth:
+  status: UNCONFIRMED
+  event_annotations_path: null
+  distance_reference: null
+  required_fields:
+    - event_id
+    - run_id
+    - time_interval
+    - annotation_source
+    - distance_or_position_reference
+
+activation:
+  mode: HACKATHON_DEMO_ASSUMED
+  geometric_decision_enabled: false
+  obstacle_candidate_enabled: true
+  safety_decision_permitted: false
+  clear_decision_permitted: false
+  candidate_result: OBSTACLE_CANDIDATE_ASSUMED_GEOMETRY
+  warning_candidate_result: WARNING_CANDIDATE_ASSUMED_GEOMETRY
+  no_candidate_result: UNKNOWN
+  approximate_distance_permitted: true
+  approximate_distance_label: APPROXIMATE_M_ASSUMED_GEOMETRY
+  production_activation_required_statuses:
+    - contract.status == VERIFIED
+    - universal_fleet_envelope.status == VERIFIED OR selected_train_profile.status == VERIFIED
+    - path.status == VERIFIED
+    - safety_envelope.status == VERIFIED
+  required_statuses:
+    - contract.status == ASSUMED_HACKATHON
+    - frames.status == ASSUMED_HACKATHON
+    - universal_fleet_envelope.status == ASSUMED_HACKATHON OR selected_train_profile.status == ASSUMED_HACKATHON
+    - path.status == ASSUMED_HACKATHON
+    - safety_envelope.status == ASSUMED_HACKATHON
+  when_unavailable:
+    system_status: UNKNOWN
+    reason: HACKATHON_DEMO_GEOMETRY_CONTRACT_UNAVAILABLE

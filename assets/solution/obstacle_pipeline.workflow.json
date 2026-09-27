@@ -1,0 +1,50 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "LiDAR obstacle pipeline",
+    "quality_profile": "showcase",
+    "viewBox": [1290, 800]
+  },
+  "lanes": [
+    { "id": "input", "label": "Вход" },
+    { "id": "geometry", "label": "Геометрия" },
+    { "id": "components", "label": "CORE и компоненты" },
+    { "id": "decision", "label": "Решение" },
+    { "id": "diagnostics", "label": "Диагностика", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "read", "label": "Чтение", "fromCol": 0, "toCol": 1 },
+    { "id": "localize", "label": "Локальная ось", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "classify", "label": "Фильтр сигнала", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["pointcloud", "quality", "rails", "envelope", "raw_core", "components", "model", "result"],
+  "nodes": [
+    { "id": "pointcloud", "lane": "input", "col": 0, "type": "external", "label": "PointCloud2 / XYZ", "width": 150 },
+    { "id": "quality", "lane": "input", "col": 1, "type": "security", "label": "Quality gate", "width": 150 },
+    { "id": "rails", "lane": "geometry", "col": 2, "type": "backend", "label": "AutoRails", "width": 150 },
+    { "id": "envelope", "lane": "geometry", "col": 3, "type": "security", "label": "Tangent envelope", "tag": "ASSUMED", "width": 160 },
+    { "id": "raw_core", "lane": "components", "col": 3, "type": "database", "label": "Raw CORE", "width": 150 },
+    { "id": "components", "lane": "components", "col": 4, "type": "backend", "label": "CORE components", "width": 155 },
+    { "id": "model", "lane": "decision", "col": 4, "type": "backend", "label": "candidate_baseline_v2", "width": 190 },
+    { "id": "result", "lane": "decision", "col": 5, "type": "external", "label": "Candidate JSON", "width": 160 },
+    { "id": "unknown", "lane": "diagnostics", "col": 5, "type": "security", "label": "UNKNOWN не CLEAR", "width": 190 }
+  ],
+  "edges": [
+    { "from": "pointcloud", "to": "quality", "label": "decode" },
+    { "from": "quality", "to": "rails", "label": "valid points", "variant": "emphasis" },
+    { "from": "rails", "to": "envelope", "label": "local rail axis" },
+    { "from": "envelope", "to": "raw_core", "label": "inside envelope" },
+    { "from": "raw_core", "to": "components", "label": "cluster" },
+    { "from": "components", "to": "model", "label": "component features" },
+    { "from": "model", "to": "result", "label": "reportable/noise" },
+    { "from": "quality", "to": "unknown", "label": "invalid input", "variant": "security", "role": "error" },
+    { "from": "envelope", "to": "unknown", "label": "assumed geometry", "variant": "dashed", "role": "error" },
+    { "from": "result", "to": "unknown", "label": "no safety clearance", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Основной путь", "items": ["PointCloud2 декодируется в source frame", "AutoRails строит локальную ось", "CORE сохраняется до модели"] },
+    { "dot": "emerald", "title": "Фильтр сигнала", "items": ["candidate_baseline_v2 поднимает reportable-компоненты", "Raw CORE остаётся диагностическим слоем"] },
+    { "dot": "rose", "title": "Safety contract", "items": ["UNKNOWN не трактуется как CLEAR", "Отрицательный ответ модели не разрешает движение"] }
+  ]
+}

@@ -1,0 +1,41 @@
+/dataset/
+
+# Local IDE metadata
+/.idea/
+/tmp/
+__pycache__/
+*.pyc
+/artefacts/
+/log/
+/docs/hackathon_documentations/ЛЦТ2026 Шаблон презентации.pptx
+/models/*
+!/models/.gitkeep
+!/models/noise_classifier_doubleT_obstacle_v1.json
+/models/
+
+
+# Submission/local data and heavy generated media
+/dataset/
+/artefacts/
+/log/
+/tmp/
+/.venv/
+/.idea/
+*.db3
+*.bag
+*.mcap
+*.pcd
+*.las
+*.laz
+*.tar
+*.zst
+*.tar.zst
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.pptx
+*.pem
+*.key
+.env
+.env.*

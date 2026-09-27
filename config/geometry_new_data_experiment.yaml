@@ -1,0 +1,113 @@
+# Offline development profile. Not mounting calibration or a verified clearance.
+# Original XYZ remain in hesai_lidar. Rail-height hypothesis comes from the
+# unchanged AutoRails detector on frames 1050/1100/1150 (near Z=-1.1 at Y=-4).
+# Dimensions and thresholds are inherited, NOT calibrated on new_data.
+schema_version: 1
+contract:
+  status: ASSUMED_HACKATHON
+  scope: OFFLINE_NEW_DATA_DEVELOPMENT_ONLY
+  source_document: docs/stages/stage_3/stage_3_new_data_transfer_plan.md
+  source_revision: 2026-09-20
+  production_revalidation_required: true
+  replacement_evidence_required: [primary_frame_and_units_specification, target_from_lidar_calibration, approved_train_profile_and_dynamic_clearance, approved_path_and_safety_margin]
+frames:
+  status: ASSUMED_HACKATHON
+  geometry_mode: SOURCE_FRAME_IDENTITY_EXPERIMENT
+  working_frame: hesai_lidar
+  target_from_source: hesai_lidar <- hesai_lidar
+  source_frame_policy:
+    hesai_lidar: ASSUMED_HACKATHON_ACTIVE
+  axis_directions:
+    x: LATERAL_RIGHT_FACING_FORWARD_ASSUMED
+    y: LONGITUDINAL_FORWARD_IS_NEGATIVE_Y_ASSUMED
+    z: VERTICAL_UP_ASSUMED
+  units: m
+  units_status: ASSUMED_HACKATHON
+  lidar_mounting_extrinsics:
+    status: UNCONFIRMED_NOT_USED
+    source_frame: hesai_lidar
+    target_frame: hesai_lidar
+    transform:
+      translation_m: [0.0, 0.0, 0.0]
+      rotation_xyzw: [0.0, 0.0, 0.0, 1.0]
+    assumption: SOURCE_IDENTITY_ONLY_NOT_LIDAR_TO_TRAIN_CALIBRATION
+timing:
+  bag_header_clock_relation: UNCONFIRMED
+  per_point_clock_relation: UNCONFIRMED
+  deskew_enabled: false
+universal_fleet_envelope:
+  status: ASSUMED_HACKATHON
+  polygon_in_working_frame:
+    coordinate_system: hesai_lidar
+    lateral_extent_m: [-1.4, 1.4]
+    vertical_extent_m: [0.0, 3.7]
+  safety_decision_permitted: false
+path:
+  status: ASSUMED_HACKATHON
+  representation: AUTO_LOCAL_TRACK_POLYLINE_WITH_STRAIGHT_FALLBACK_NEGATIVE_Y
+  rail_centerline_in_working_frame:
+    x_m: 0.0
+    z_m: -1.1
+    forward_axis: -y
+    valid_forward_range_m: [0.0, 200.0]
+auto_grade_path:
+  status: ASSUMED_HACKATHON
+  enabled: true
+  estimation:
+    support_surface: FLOOR_UNDER_RAILS_ASSUMED
+    lateral_window_m: [-1.8, 1.8]
+    fit_forward_range_m: [0.0, 60.0]
+    bin_size_m: 10.0
+    floor_support_quantile_z: 0.10
+    min_points_per_bin: 200
+    min_valid_bins: 4
+    max_abs_grade: 0.10
+    max_fit_residual_m: 0.40
+  safety_decision_permitted: false
+auto_track_path:
+  status: ASSUMED_HACKATHON
+  enabled: true
+  estimation:
+    support_surface: FLOOR_UNDER_RAILS_ASSUMED
+    fit_forward_range_m: [0.0, 200.0]
+    bin_size_m: 10.0
+    initial_lateral_center_m: 0.0
+    lateral_search_half_width_m: 3.5
+    floor_support_quantile_z: 0.10
+    floor_band_above_quantile_m: 0.35
+    min_points_per_bin: 60
+    min_valid_bins: 4
+    max_lateral_step_m: 1.50
+    max_abs_grade: 0.10
+  safety_decision_permitted: false
+safety_envelope:
+  status: ASSUMED_HACKATHON
+  margin: 0.20
+warning_layer:
+  status: ASSUMED_HACKATHON
+  offsets_from_profile_m: {left: 0.50, right: 0.50, top: 0.50, bottom: 1.30}
+  safety_decision_permitted: false
+detection:
+  status: ASSUMED_HACKATHON
+  mode: ENVELOPE_ONLY_VOXEL_COMPONENTS
+  roi: {forward_min_m: 0.0, forward_max_m: 200.0}
+  clustering: {voxel_size_m: 0.25, min_cluster_points: 5, connectivity: 26}
+  numeric_boundary_tolerance_m: 0.000001
+  protrusion_segmentation:
+    enabled: true
+    status: ASSUMED_HACKATHON
+    min_height_above_floor_m: 0.35
+    max_height_above_floor_m: 2.8
+    voxel_size_m: 0.20
+    min_points: 5
+    max_horizontal_extent_m: 3.0
+  excluded_processing: [background_subtraction, ground_or_rail_removal, deskew, temporal_confirmation]
+activation:
+  geometric_decision_enabled: false
+  obstacle_candidate_enabled: true
+  safety_decision_permitted: false
+  clear_decision_permitted: false
+  candidate_result: OBSTACLE_CANDIDATE_ASSUMED_GEOMETRY
+  warning_candidate_result: WARNING_CANDIDATE_ASSUMED_GEOMETRY
+  no_candidate_result: UNKNOWN
+  approximate_distance_label: APPROXIMATE_M_ASSUMED_GEOMETRY

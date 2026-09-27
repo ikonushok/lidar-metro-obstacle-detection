@@ -1,0 +1,5 @@
+{
+  "voxel_size_m": 0.25,
+  "min_cluster_points": 5,
+  "max_voxels": 50000
+}

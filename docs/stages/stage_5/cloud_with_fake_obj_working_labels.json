@@ -1,0 +1,132 @@
+{
+  "format": "lidar_obstacle_working_event_labels_v1",
+  "created_at": "2026-09-25",
+  "scope": "development_benchmark_not_final_gt",
+  "decision_rule": "Object is a target obstacle when its LiDAR points intersect the accepted train core-gabarit on the checked rail axis. Objects outside or above the core-gabarit are boundary/negative for obstacle detection.",
+  "sources": [
+    {
+      "source_id": "doubleT_obstacle",
+      "dataset": "dataset/for_hackathon/for_hackathon",
+      "status": "project_confirmed_positive_regression",
+      "events": [
+        {
+          "event_id": "doubleT_obstacle_positive_001",
+          "organizer_order": null,
+          "description": "Known project positive interval in doubleT_obstacle.",
+          "expected_class": "positive_target",
+          "frame_interval": [13, 64],
+          "matching_status": "localized",
+          "label_source": "project_working_label",
+          "notes": "Historical development/regression positive; not independent held-out evidence."
+        }
+      ]
+    },
+    {
+      "source_id": "cloud_with_fake_obj",
+      "dataset": "dataset/for_hackathon/cloud_with_fake_obj",
+      "status": "organizer_confirmed_synthetic_objects",
+      "events": [
+        {
+          "event_id": "cloud_fake_obj_01_2x2_center",
+          "organizer_order": 1,
+          "description": "Organizer-confirmed large 2x2 m object in the center of the gabarit.",
+          "expected_class": "positive_target",
+          "frame_interval": [204, 216],
+          "matching_status": "localized_raw_core",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Strong raw CORE match; strongest frames 213..216."
+        },
+        {
+          "event_id": "cloud_fake_obj_02_small_center",
+          "organizer_order": 2,
+          "description": "Organizer-confirmed small 0.3x0.3 m object in the center of the gabarit.",
+          "expected_class": "positive_target",
+          "frame_interval": [365, 368],
+          "matching_status": "localized_raw_core",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Frame 369 is UNKNOWN in the current detector output and is not included in this localized scoring window."
+        },
+        {
+          "event_id": "cloud_fake_obj_03_small_on_rails",
+          "organizer_order": 3,
+          "description": "Organizer-confirmed small 0.3x0.3 m object standing on the rails.",
+          "expected_class": "positive_target",
+          "frame_interval": [478, 480],
+          "matching_status": "localized_raw_core",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Low/rail-level small object."
+        },
+        {
+          "event_id": "cloud_fake_obj_04_small_edge_inside",
+          "organizer_order": 4,
+          "description": "Organizer-confirmed small 0.3x0.3 m object at the edge of the gabarit.",
+          "expected_class": "positive_target",
+          "frame_interval": [530, 532],
+          "matching_status": "localized_raw_core",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Boundary-inside positive object."
+        },
+        {
+          "event_id": "cloud_fake_obj_05_small_outside_close",
+          "organizer_order": 5,
+          "description": "Organizer-confirmed small 0.3x0.3 m object outside the gabarit, but close.",
+          "expected_class": "negative_boundary",
+          "frame_interval": null,
+          "matching_status": "needs_localization",
+          "label_source": "organizer_description",
+          "notes": "Not a target obstacle for core-gabarit detection; may be useful for margin/boundary checks after localization."
+        },
+        {
+          "event_id": "cloud_fake_obj_06_2x2_edge_inside",
+          "organizer_order": 6,
+          "description": "Organizer-confirmed large 2x2 m object at the edge, inside the gabarit.",
+          "expected_class": "positive_target",
+          "frame_interval": [579, 581],
+          "matching_status": "localized_raw_core",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Boundary-inside positive object."
+        },
+        {
+          "event_id": "cloud_fake_obj_07_2x2_outside",
+          "organizer_order": 7,
+          "description": "Organizer-confirmed large 2x2 m object outside the gabarit.",
+          "expected_class": "negative_boundary",
+          "frame_interval": [630, 633],
+          "matching_status": "localized_raw_core_boundary_check",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Boundary/negative for target obstacle detection. Current raw CORE audit sees strong components here, so this is an important boundary calibration risk."
+        },
+        {
+          "event_id": "cloud_fake_obj_08_2x2_above",
+          "organizer_order": 8,
+          "description": "Organizer-confirmed large 2x2 m object above the gabarit.",
+          "expected_class": "negative_boundary",
+          "frame_interval": [674, 681],
+          "matching_status": "visual_confirmed_raw_core_boundary_check",
+          "label_source": "organizer_description_plus_raw_core_visual_mapping",
+          "notes": "Visual-only PointCloud2 check confirms an upper/above component; not a target obstacle for core-gabarit detection."
+        },
+        {
+          "event_id": "cloud_fake_obj_09_long_low_on_rails",
+          "organizer_order": 9,
+          "description": "Organizer-confirmed long low object lying on the rails, 2x0.2 m.",
+          "expected_class": "positive_target",
+          "frame_interval": [1138, 1156],
+          "matching_status": "localized_raw_core",
+          "label_source": "organizer_description_plus_raw_core_mapping",
+          "notes": "Long low positive object; window is broader because raw CORE components are fragmented."
+        },
+        {
+          "event_id": "cloud_fake_obj_10_narrow_hanging",
+          "organizer_order": 10,
+          "description": "Organizer-confirmed narrow long object hanging from the ceiling, width 0.05 m.",
+          "expected_class": "positive_target",
+          "frame_interval": null,
+          "matching_status": "needs_localization_full_cloud_scan_no_core_candidate",
+          "label_source": "organizer_description",
+          "notes": "Potential positive only if visual/geometry evidence confirms CORE-gabarit intersection. Full-cloud scan of frames 1157..1509 found no central CORE-positive hanging candidate; wide candidates were edge/side infrastructure-like, so this event remains unlocalized and unscorable."
+        }
+      ]
+    }
+  ]
+}

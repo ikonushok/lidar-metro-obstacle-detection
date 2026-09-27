@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>doubleT_obstacle — ручной 3D-просмотр</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0a1019; color: #e7edf5; }
+    body { margin: 0; min-width: 320px; }
+    main { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; }
+    header, footer { padding: 12px 16px; background: #101b2b; border-bottom: 1px solid #2b405c; }
+    footer { border-top: 1px solid #2b405c; border-bottom: 0; font-size: 13px; color: #b9c9dc; }
+    h1 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+    .warning { color: #ff9b9b; font-weight: 700; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+    button, select, input { font: inherit; }
+    button, select { min-height: 34px; padding: 4px 9px; border: 1px solid #557190; background: #17263b; color: #e7edf5; border-radius: 4px; }
+    button:hover, select:hover { background: #243a57; }
+    label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+    #frame-range { width: min(500px, 44vw); }
+    #scene-wrap { position: relative; min-height: 400px; }
+    #scene { position: absolute; inset: 0; }
+    #scene canvas { display: block; width: 100%; height: 100%; }
+    .hud { position: absolute; z-index: 2; left: 12px; max-width: min(590px, calc(100% - 24px)); padding: 8px 10px; background: rgba(7, 14, 24, .82); border: 1px solid rgba(131, 164, 201, .55); border-radius: 4px; font-size: 13px; line-height: 1.45; pointer-events: none; }
+    #status { top: 12px; } #overlay-label { right: 12px; left: auto; color: #ff9999; font-weight: 700; text-align: right; }
+    #error { display: none; position: absolute; z-index: 3; inset: 25% 12px auto; padding: 14px; background: #521d28; border: 1px solid #ff9b9b; color: white; }
+    .muted { color: #b9c9dc; }
+    @media (max-width: 650px) { #frame-range { width: 100%; } .hud { font-size: 12px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>doubleT_obstacle — ручной 3D-просмотр LiDAR</h1>
+      <div class="controls">
+        <button id="play" type="button">▶ Запуск</button>
+        <button id="previous" type="button">◀ Кадр</button>
+        <button id="next" type="button">Кадр ▶</button>
+        <label>Кадр <input id="frame-range" type="range" min="0" value="0"><output id="frame-output">0</output></label>
+        <label>Скорость <select id="speed"><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+        <label>Ракурс <select id="view"><option value="forward">Строго вперёд (−Y)</option><option value="top">Сверху</option><option value="side">Сбоку</option><option value="free">Свободное вращение</option></select></label>
+        <label><input id="reference-crop" type="checkbox"> Только справочный габарит по X/Z*</label>
+        <label>В виде сверху: справа (X−), м <input id="reference-crop-left" type="number" min="0" max="10" step="0.1" value="0.5" inputmode="decimal"></label>
+        <label>В виде сверху: слева (X+), м <input id="reference-crop-right" type="number" min="0" max="10" step="0.1" value="0.5" inputmode="decimal"></label>
+        <label>Сверху, м <input id="reference-crop-top" type="number" min="0" max="10" step="0.1" value="0.5" inputmode="decimal"></label>
+        <label>Снизу, м <input id="reference-crop-bottom" type="number" min="0" max="10" step="0.1" value="0.5" inputmode="decimal"></label>
+        <label><input id="experimental-clusters" type="checkbox"> Экспериментальные кластеры*</label>
+        <label>Ячейка, м <input id="cluster-voxel" type="number" min="0.05" max="2" step="0.05" value="0.25" inputmode="decimal"></label>
+        <label>Мин. точек <input id="cluster-min-points" type="number" min="1" max="10000" step="1" value="15" inputmode="numeric"></label>
+        <label><input id="stage-3-overlay" type="checkbox" checked> Stage 3 core/warning*</label>
+        <label style="color:#ff78d5" title="Розовые рамки: отдельные компоненты над предполагаемым полом; это не классификация людей"><input id="protrusion-overlay" type="checkbox" checked> Выступающие объекты — розовые</label>
+        <label style="color:#8774ff"><input id="train-volume" type="checkbox" checked> Габарит поезда</label>
+        <label style="color:#d4c6ff"><input id="margin-volume" type="checkbox" checked> Габарит с отступами</label>
+        <label><input id="floor-grid" type="checkbox" checked> Сетка пола</label>
+        <label><input id="candidate-audit" type="checkbox" disabled> Audit: визуально статичные ячейки (жёлтые)*</label>
+        <button id="label-person-1" type="button">Человек 1 — по точкам (0–90)</button>
+        <button id="label-person-2" type="button">Человек 2 — по точкам (150–170)</button>
+        <button id="export-people" type="button" disabled>Скачать выбранные отметки</button>
+        <span id="people-status" role="status" style="font-size:13px">Люди ещё не привязаны к рамкам.</span>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:6px"><span style="color:#8774ff">■ Габарит поезда</span> · <span style="color:#d4c6ff">■ Зона с отступами из полей выше</span> · <span style="color:#ff3f58">■ Красные рамки — кластеры кандидатов, не габарит</span> · <span style="color:#ffc34d">■ Жёлтые — повторяемость / warning (по включённому слою)</span>. Бледное продолжение за опорными точками — экстраполяция. Габариты — визуальная гипотеза.</div>
+    </header>
+    <section id="scene-wrap" aria-label="Трёхмерное облако точек текущего кадра">
+      <div id="scene"></div>
+      <div id="status" class="hud" aria-live="polite">Загрузка manifest…</div>
+      <div id="overlay-label" class="hud">UNCONFIRMED / manual review only</div>
+      <div id="error" role="alert"></div>
+    </section>
+  <footer id="technical-note">Техническое ограничение: без включённого фильтра кадр выводится целиком; при нехватке памяти браузера/GPU плеер сообщит об ошибке, но не применит скрытое прореживание. Справочный X/Z-фильтр сохраняет всю глубину по −Y: продольной рамки или отсечки в плеере нет. Stage 3 overlay показывает сохранённые bounds candidate-only baseline: красный — core, оранжевый — warning-layer. *Неподтверждённый инструмент ручного просмотра, не safety margin и не классификация.</footer>
+  </main>
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/OrbitControls.js"></script>
+  <script>
+  (() => {
+    'use strict';
+    const sceneRoot = document.getElementById('scene');
+    const status = document.getElementById('status');
+    const errorBox = document.getElementById('error');
+    const range = document.getElementById('frame-range');
+    const frameOutput = document.getElementById('frame-output');
+    const playButton = document.getElementById('play');
+    const previous = document.getElementById('previous');
+    const next = document.getElementById('next');
+    const speed = document.getElementById('speed');
+    const view = document.getElementById('view');
+    const referenceCrop = document.getElementById('reference-crop');
+    const referenceCropMargins = {
+      left: document.getElementById('reference-crop-left'),
+      right: document.getElementById('reference-crop-right'),
+      top: document.getElementById('reference-crop-top'),
+      bottom: document.getElementById('reference-crop-bottom'),
+    };
+    const experimentalClusters = document.getElementById('experimental-clusters');
+    const clusterVoxel = document.getElementById('cluster-voxel');
+    const clusterMinPoints = document.getElementById('cluster-min-points');
+    const stage3Overlay = document.getElementById('stage-3-overlay');
+    const protrusionOverlay = document.getElementById('protrusion-overlay');
+    const candidateAuditToggle = document.getElementById('candidate-audit');
+    const trainVolumeToggle = document.getElementById('train-volume');
+    const marginVolumeToggle = document.getElementById('margin-volume');
+    const floorGridToggle = document.getElementById('floor-grid');
+    let envelopeLines = [];
+    const peopleStatus = document.getElementById('people-status');
+    const exportPeople = document.getElementById('export-people');
+    const peopleAnnotations = {};
+    let personMarkers = [];
+    let personToSelect = null, pickStart = null;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07101c);
+    const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 400);
+    camera.up.set(0, 0, 1);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    sceneRoot.appendChild(renderer.domElement);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, -20, 1.7);
+    let grid = buildFallbackGrid();
+    scene.add(grid);
+    const axes = new THREE.AxesHelper(3);
+    scene.add(axes);
+    let manifest, candidateAudit, currentIndex = 0, currentPoints, clusterPoints, referenceProfileLine, autoGradePathLine, stage3Boxes = [], candidateAuditBoxes = [], fullPositions, playing = false, timer, requestNumber = 0;
+    const cache = new Map();
+    const cacheLimit = 3;
+
+    function fail(message) { errorBox.textContent = message; errorBox.style.display = 'block'; playing = false; playButton.textContent = '▶ Запуск'; }
+    function resize() { const w = sceneRoot.clientWidth, h = sceneRoot.clientHeight; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false); }
+    new ResizeObserver(resize).observe(sceneRoot); resize();
+    function setView(name) {
+      controls.enabled = name === 'free';
+      if (name === 'forward') { camera.position.set(0, 0, 0); controls.target.set(0, -35, 0); }
+      if (name === 'top') { camera.position.set(0, -20, 55); controls.target.set(0, -20, 0); camera.up.set(0, -1, 0); }
+      if (name === 'side') { camera.position.set(35, -20, 2); controls.target.set(0, -20, 2); camera.up.set(0, 0, 1); }
+      if (name === 'free') { camera.position.set(19, 12, 13); controls.target.set(0, -20, 1.7); camera.up.set(0, 0, 1); }
+      camera.lookAt(controls.target); controls.update();
+    }
+    function edgesForBounds(bounds, color, alwaysVisible = false) {
+      const geometry = new THREE.BoxGeometry(bounds.x.max - bounds.x.min, bounds.y.max - bounds.y.min, bounds.z.max - bounds.z.min);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({
+        color, depthTest: !alwaysVisible, depthWrite: !alwaysVisible,
+      }));
+      edges.position.set((bounds.x.min + bounds.x.max) / 2, (bounds.y.min + bounds.y.max) / 2, (bounds.z.min + bounds.z.max) / 2);
+      if (alwaysVisible) edges.renderOrder = 1;
+      scene.add(edges);
+      return edges;
+    }
+    function buildFallbackGrid() {
+      const fallback = new THREE.GridHelper(80, 16, 0x35506d, 0x20354b);
+      fallback.rotation.x = Math.PI / 2;
+      return fallback;
+    }
+    function replaceGrid(nextGrid) {
+      scene.remove(grid);
+      for (const label of grid.children) {
+        if (label.material && label.material.map) label.material.map.dispose();
+        if (label.material) label.material.dispose();
+      }
+      grid.geometry.dispose();
+      if (Array.isArray(grid.material)) grid.material.forEach(material => material.dispose());
+      else grid.material.dispose();
+      grid = nextGrid;
+      scene.add(grid);
+    }
+    function extendedPathNodes(profile) {
+      const source = profile.nodes;
+      const nodes = source.map(node => ({...node}));
+      let farDepth = 0;
+      for (let i = 1; i < fullPositions.length; i += 3) farDepth = Math.max(farDepth, -fullPositions[i]);
+      const extrapolate = (a, b, depth) => {
+        const t = (depth - a.depth_m) / (b.depth_m - a.depth_m);
+        return {depth_m: depth, x_m: a.x_m + t * (b.x_m - a.x_m),
+                y_m: -depth, z_m: a.z_m + t * (b.z_m - a.z_m), extrapolated: true};
+      };
+      if (source.length >= 2) {
+        if (source[0].depth_m > 0) nodes.unshift(extrapolate(source[0], source[1], 0));
+        // Visualization only: robust terminal direction, not a calibrated rail model.
+        const support = source.slice(-5), b = support[support.length - 1];
+        const median = values => {
+          const sorted = [...values].sort((a,b) => a-b), mid = Math.floor(sorted.length/2);
+          return sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+        };
+        const fit = key => {
+          const slopes = [];
+          for (let i=0;i<support.length;i++) for (let j=i+1;j<support.length;j++) {
+            slopes.push((support[j][key]-support[i][key])/(support[j].depth_m-support[i].depth_m));
+          }
+          const slope = median(slopes);
+          const intercept = median(support.map(n => n[key]-slope*n.depth_m));
+          const residual = Math.max(...support.map(n => Math.abs(n[key]-intercept-slope*n.depth_m)));
+          return {slope, spread: Math.max(...slopes)-Math.min(...slopes), residual};
+        };
+        const xFit = fit('x_m'), zFit = fit('z_m');
+        const span = b.depth_m-support[0].depth_m;
+        const extend = depth => {
+          const distance = depth-b.depth_m;
+          // No long-horizon precise volume from a short or inconsistent support.
+          const reliable = support.length >= 4 && distance <= span &&
+            [xFit,zFit].every(f => distance*f.spread <= f.residual+1e-6);
+          return {depth_m:depth, y_m:-depth, x_m:b.x_m+distance*xFit.slope,
+            z_m:b.z_m+distance*zFit.slope, extrapolated:true,
+            envelopeEligible:reliable, continuationStatus:reliable ? 'ASSUMED' : 'UNKNOWN'};
+        };
+        for (let depth = b.depth_m + 10; depth < farDepth; depth += 10) nodes.push(extend(depth));
+        if (farDepth > b.depth_m) nodes.push(extend(farDepth));
+      }
+      return nodes;
+    }
+    function straightRailCenterline(overlay) {
+      // Reference-only visual axis.  This is the explicitly configured
+      // straight -Y assumption, not an automatic rail detector or a
+      // calibrated safety path.
+      const placement = overlay.placement_in_source_coordinates;
+      const start = Number(placement.forward_start_m);
+      const end = Number(placement.forward_end_m);
+      return {nodes: [start, end].map(depth => ({
+        depth_m: depth,
+        x_m: Number(placement.track_centerline_lateral_m),
+        y_m: -depth,
+        z_m: Number(placement.rail_head_vertical_m),
+      }))};
+    }
+    function buildTrackGrid(profile) {
+      const lines = [], colors = [];
+      const labels = [];
+      const nodes = extendedPathNodes(profile);
+      const addColor = extrapolated => {
+        const color = new THREE.Color(extrapolated ? 0x203044 : 0x35506d);
+        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+      };
+      const normalAt = index => {
+        const from = nodes[Math.max(0, index - 1)], to = nodes[Math.min(nodes.length - 1, index + 1)];
+        const dx = to.x_m - from.x_m, dy = to.y_m - from.y_m, length = Math.hypot(dx, dy);
+        return length > 1e-6 ? [-dy / length, dx / length] : [1, 0];
+      };
+      for (let offset = -10; offset <= 10; offset += 5) {
+        for (let index = 0; index < nodes.length - 1; index++) {
+          const start = nodes[index], end = nodes[index + 1], a = normalAt(index), b = normalAt(index + 1);
+          lines.push(start.x_m + offset * a[0], start.y_m + offset * a[1], start.z_m,
+                     end.x_m + offset * b[0], end.y_m + offset * b[1], end.z_m);
+          addColor(start.extrapolated || end.extrapolated);
+        }
+      }
+      for (let index = 0; index < nodes.length; index++) {
+        const node = nodes[index], normal = normalAt(index);
+        lines.push(node.x_m - 10 * normal[0], node.y_m - 10 * normal[1], node.z_m,
+                   node.x_m + 10 * normal[0], node.y_m + 10 * normal[1], node.z_m);
+        addColor(node.extrapolated);
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 64;
+        const context = canvas.getContext('2d');
+        context.fillStyle = 'rgba(7,16,28,0.88)';
+        context.fillRect(0,0,256,64);
+        context.font = 'bold 38px sans-serif';
+        context.textAlign = 'center'; context.textBaseline = 'middle';
+        context.fillStyle = node.extrapolated ? '#91a4b9' : '#d6e7ff';
+        context.fillText(Number(node.depth_m.toFixed(1)).toLocaleString('ru-RU') + ' м',128,32);
+        const texture = new THREE.CanvasTexture(canvas);
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false}));
+        label.position.set(node.x_m + 12 * normal[0],node.y_m + 12 * normal[1],node.z_m + 0.15);
+        label.scale.set(4,1,1);
+        labels.push(label);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      const mesh = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true }));
+      labels.forEach(label => mesh.add(label));
+      return mesh;
+    }
+    function buildReferenceOverlay(overlay, verticalOffset = 0, lateralOffset = 0, forwardOffset = 0) {
+      if (referenceProfileLine) {
+        scene.remove(referenceProfileLine);
+        referenceProfileLine.geometry.dispose();
+        referenceProfileLine.material.dispose();
+      }
+      const p = overlay.placement_in_source_coordinates;
+      const x = overlay.reference_cross_section.lateral_extent_m;
+      const z = overlay.reference_cross_section.vertical_extent_above_rail_m;
+      const y = -p.forward_start_m + forwardOffset;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        x.min + p.track_centerline_lateral_m + lateralOffset, y, z.min + p.rail_head_vertical_m + verticalOffset,
+        x.max + p.track_centerline_lateral_m + lateralOffset, y, z.min + p.rail_head_vertical_m + verticalOffset,
+        x.max + p.track_centerline_lateral_m + lateralOffset, y, z.max + p.rail_head_vertical_m + verticalOffset,
+        x.min + p.track_centerline_lateral_m + lateralOffset, y, z.max + p.rail_head_vertical_m + verticalOffset,
+        x.min + p.track_centerline_lateral_m + lateralOffset, y, z.min + p.rail_head_vertical_m + verticalOffset,
+      ]), 3));
+      referenceProfileLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xff3f58 }));
+      scene.add(referenceProfileLine);
+    }
+    function cacheFrame(index, positions) { cache.delete(index); cache.set(index, positions); while (cache.size > cacheLimit) cache.delete(cache.keys().next().value); }
+    async function positionsFor(index) {
+      if (cache.has(index)) { const positions = cache.get(index); cacheFrame(index, positions); return positions; }
+      const response = await fetch(manifest.frames[index].file, { cache: 'force-cache' });
+      if (!response.ok) throw new Error('Не удалось загрузить файл кадра: HTTP ' + response.status);
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength !== manifest.frames[index].displayed_points * 12) throw new Error('Размер файла кадра не совпадает с manifest; кадр не показан.');
+      const positions = new Float32Array(bytes);
+      cacheFrame(index, positions);
+      return positions;
+    }
+    function renderPoints(positions) {
+      if (currentPoints) { scene.remove(currentPoints); currentPoints.geometry.dispose(); currentPoints.material.dispose(); }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.computeBoundingSphere();
+      currentPoints = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0x67d9ff, size: 0.035, sizeAttenuation: true }));
+      scene.add(currentPoints);
+    }
+    function renderClusters(result) {
+      if (clusterPoints) { scene.remove(clusterPoints); clusterPoints.geometry.dispose(); clusterPoints.material.dispose(); clusterPoints = null; }
+      if (!result || !result.positions.length) return;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(result.positions, 3));
+      geometry.setAttribute('color', new THREE.Uint8BufferAttribute(result.colors, 3, true));
+      geometry.computeBoundingSphere();
+      clusterPoints = new THREE.Points(geometry, new THREE.PointsMaterial({ vertexColors: true, size: 0.075, sizeAttenuation: true }));
+      scene.add(clusterPoints);
+    }
+    function clearStage3Boxes() {
+      for (const box of stage3Boxes) {
+        scene.remove(box);
+        box.geometry.dispose();
+        box.material.dispose();
+      }
+      stage3Boxes = [];
+    }
+    function visibleBounds(bounds) {
+      const expanded = {};
+      for (const axis of ['x', 'y', 'z']) {
+        const min = Number(bounds[axis].min), max = Number(bounds[axis].max);
+        const center = (min + max) / 2;
+        expanded[axis] = Math.abs(max - min) < 0.02 ? { min: center - 0.01, max: center + 0.01 } : { min, max };
+      }
+      return expanded;
+    }
+    function renderStage3Bounds(result) {
+      clearStage3Boxes();
+      if (!result || !Array.isArray(result.clusters)) return;
+      for (const cluster of (stage3Overlay.checked ? result.clusters : [])) {
+        if (!cluster.bounds_source_coordinates) continue;
+        const color = cluster.zone === 'CORE_ASSUMED_ENVELOPE' ? 0xff3f58 : 0xffc34d;
+        const box = edgesForBounds(visibleBounds(cluster.bounds_source_coordinates), color);
+        box.userData.cluster = cluster;
+        box.userData.clusterIndex = result.clusters.indexOf(cluster);
+        stage3Boxes.push(box);
+      }
+      if (protrusionOverlay.checked) {
+        for (const cluster of (result.protrusion_clusters || [])) {
+          stage3Boxes.push(edgesForBounds(visibleBounds(cluster.bounds_source_coordinates),0xff78d5,true));
+        }
+      }
+    }
+    function clearAutoGradePath() {
+      if (!autoGradePathLine) return;
+      scene.remove(autoGradePathLine);
+      autoGradePathLine.geometry.dispose();
+      autoGradePathLine.material.dispose();
+      autoGradePathLine = undefined;
+    }
+    function renderAutoGradePath(result) {
+      clearAutoGradePath();
+      const path = straightRailCenterline(manifest.visualization_overlay);
+      const positions = path.nodes.flatMap(node => [node.x_m, node.y_m, node.z_m]);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      autoGradePathLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x35e86c }));
+      scene.add(autoGradePathLine);
+    }
+    function renderReferenceProfile(result) {
+      for (const line of envelopeLines) {
+        scene.remove(line); line.geometry.dispose(); line.material.dispose();
+      }
+      envelopeLines = [];
+      const path = straightRailCenterline(manifest.visualization_overlay);
+      const nodes = extendedPathNodes(path).filter(node => node.envelopeEligible !== false);
+      const reference = manifest.visualization_overlay.reference_cross_section;
+      const build = (margins, colorValue) => {
+        const rings = nodes.map((node, i) => {
+          const a = nodes[Math.max(0,i-1)], b = nodes[Math.min(nodes.length-1,i+1)];
+          const length = Math.hypot(b.x_m-a.x_m,b.y_m-a.y_m) || 1;
+          const nx = -(b.y_m-a.y_m)/length, ny = (b.x_m-a.x_m)/length;
+          const x = reference.lateral_extent_m, z = reference.vertical_extent_above_rail_m;
+          return [[x.min-margins.left,z.min-margins.bottom], [x.max+margins.right,z.min-margins.bottom],
+                  [x.max+margins.right,z.max+margins.top], [x.min-margins.left,z.max+margins.top]]
+            .map(([lateral,height]) => [node.x_m+nx*lateral,node.y_m+ny*lateral,node.z_m+height]);
+        });
+        const positions = [], colors = [];
+        const edge = (a,b,uncertain) => {
+          positions.push(...a,...b);
+          const c = new THREE.Color(colorValue);
+          if (uncertain) c.multiplyScalar(0.4);
+          colors.push(c.r,c.g,c.b,c.r,c.g,c.b);
+        };
+        rings.forEach((ring,i) => {
+          for (let j=0;j<4;j++) {
+            edge(ring[j],ring[(j+1)%4],nodes[i].extrapolated);
+            if (i) edge(rings[i-1][j],ring[j],nodes[i-1].extrapolated || nodes[i].extrapolated);
+          }
+        });
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+        geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+        const line = new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true}));
+        scene.add(line); envelopeLines.push(line);
+      };
+      if (trainVolumeToggle.checked) build({left:0,right:0,top:0,bottom:0},0x8774ff);
+      if (marginVolumeToggle.checked) build(currentMarginsM(),0xd4c6ff);
+    }
+    function renderFloorGrid(result) {
+      replaceGrid(buildTrackGrid(straightRailCenterline(manifest.visualization_overlay)));
+    }
+    function clearCandidateAuditBoxes() {
+      for (const box of candidateAuditBoxes) {
+        scene.remove(box);
+        box.geometry.dispose();
+        box.material.dispose();
+      }
+      candidateAuditBoxes = [];
+    }
+    function renderCandidateAudit() {
+      clearCandidateAuditBoxes();
+      if (!candidateAuditToggle.checked || !candidateAudit) return;
+      for (const group of candidateAudit.recurrent_groups) {
+        candidateAuditBoxes.push(edgesForBounds(visibleBounds(group.bounds_source_coordinates), 0xffc34d, true));
+      }
+    }
+    async function loadCandidateAudit() {
+      candidateAuditToggle.disabled = true;
+      try {
+        const response = await fetch('candidate_audit.json', { cache: 'no-cache' });
+        if (!response.ok) return;
+        const audit = await response.json();
+        if (!Array.isArray(audit.recurrent_groups) || !Array.isArray(audit.frame_window_inclusive) ||
+            !String(audit.scope || '').includes('not tracking')) return;
+        candidateAudit = audit;
+        candidateAuditToggle.disabled = false;
+      } catch (_) {
+        candidateAudit = undefined;
+      }
+    }
+    function currentMarginsM() {
+      const margins = {};
+      for (const [side, input] of Object.entries(referenceCropMargins)) {
+        const value = Number(input.value);
+        if (!Number.isFinite(value) || value < 0 || value > 10) throw new Error('Каждый отступ должен быть числом от 0 до 10 м.');
+        margins[side] = value;
+      }
+      return margins;
+    }
+    function floorCoordinates(x, y, z, result) {
+      const profiles = result && result.path_profiles;
+      const track = (profiles && profiles.auto_track) || (result && result.path_profile);
+      const depth = -y;
+      if (track && track.status === 'ACTIVE_ASSUMED_AUTO_TRACK') {
+        const nodes = track.nodes;
+        for (let i = 1; i < nodes.length; i++) {
+          const a = nodes[i - 1], b = nodes[i];
+          if (depth < a.depth_m || depth > b.depth_m) continue;
+          const t = (depth - a.depth_m) / (b.depth_m - a.depth_m);
+          const dx = b.x_m - a.x_m, dy = b.y_m - a.y_m;
+          const length = Math.hypot(dx, dy);
+          return {x: ((x - a.x_m) * (-dy) + (y - a.y_m) * dx) / length,
+                  z: z - (a.z_m + t * (b.z_m - a.z_m))};
+        }
+      }
+      const grade = (profiles && profiles.auto_grade) || (result && result.path_profile);
+      if (grade && grade.status === 'ACTIVE_ASSUMED_AUTO_GRADE') {
+        return {x, z: z - grade.z_intercept_m - grade.grade_m_per_m * depth};
+      }
+      return null;
+    }
+    function croppedPositions(positions, bounds, margins, result) {
+      const effective = effectiveCropBounds(bounds, margins);
+      const filtered = new Float32Array(positions.length);
+      let target = 0;
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+        const local = floorCoordinates(x, y, z, result);
+        // Unknown floor: retain returns rather than silently crop at Z=0.
+        if (!local || (local.x >= effective.x.min && local.x <= effective.x.max && local.z >= effective.z.min && local.z <= effective.z.max)) {
+          filtered[target++] = x; filtered[target++] = y; filtered[target++] = z;
+        }
+      }
+      return filtered.slice(0, target);
+    }
+    function effectiveCropBounds(bounds, margins) {
+      return {
+        x: { min: bounds.x.min - margins.left, max: bounds.x.max + margins.right },
+        z: { min: bounds.z.min - margins.bottom, max: bounds.z.max + margins.top },
+      };
+    }
+    function clusterSettings() {
+      const voxel = Number(clusterVoxel.value);
+      const minimumPoints = Number(clusterMinPoints.value);
+      if (!Number.isFinite(voxel) || voxel < 0.05 || voxel > 2) throw new Error('Размер ячейки кластеров должен быть от 0,05 до 2 м.');
+      if (!Number.isInteger(minimumPoints) || minimumPoints < 1 || minimumPoints > 10000) throw new Error('Минимум точек кластера должен быть целым числом от 1 до 10000.');
+      return { voxel, minimumPoints };
+    }
+    function experimentalClusterResult(positions, settings) {
+      const voxels = new Map();
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = Math.floor(positions[i] / settings.voxel);
+        const y = Math.floor(positions[i + 1] / settings.voxel);
+        const z = Math.floor(positions[i + 2] / settings.voxel);
+        const key = x + ',' + y + ',' + z;
+        let voxel = voxels.get(key);
+        if (!voxel) { voxel = { x, y, z, offsets: [] }; voxels.set(key, voxel); }
+        voxel.offsets.push(i);
+      }
+      const visited = new Set(), output = [], colors = [];
+      const palette = [[255, 79, 105], [255, 195, 77], [174, 126, 255], [75, 224, 176], [255, 126, 209], [130, 211, 255]];
+      let clusterCount = 0;
+      for (const [startKey, startVoxel] of voxels) {
+        if (visited.has(startKey)) continue;
+        const queue = [startVoxel], component = [];
+        visited.add(startKey);
+        for (let head = 0; head < queue.length; head += 1) {
+          const voxel = queue[head];
+          component.push(...voxel.offsets);
+          for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
+            const key = (voxel.x + dx) + ',' + (voxel.y + dy) + ',' + (voxel.z + dz);
+            const neighbour = voxels.get(key);
+            if (neighbour && !visited.has(key)) { visited.add(key); queue.push(neighbour); }
+          }
+        }
+        if (component.length < settings.minimumPoints) continue;
+        const color = palette[clusterCount % palette.length];
+        clusterCount += 1;
+        for (const offset of component) {
+          output.push(positions[offset], positions[offset + 1], positions[offset + 2]);
+          colors.push(color[0], color[1], color[2]);
+        }
+      }
+      return { positions: new Float32Array(output), colors: new Uint8Array(colors), clusterCount };
+    }
+    function renderCurrentFrame() {
+      if (!fullPositions || !manifest) return;
+      const stage3Result = manifest.frames[currentIndex].stage_3_baseline;
+      const needsReferenceBand = referenceCrop.checked || experimentalClusters.checked;
+      const margins = needsReferenceBand ? currentMarginsM() : null;
+      const effective = margins === null ? null : effectiveCropBounds(manifest.visualization_crop.bounds_source_coordinates, margins);
+      const selectedPositions = effective === null
+        ? fullPositions
+        : croppedPositions(fullPositions, manifest.visualization_crop.bounds_source_coordinates, margins, stage3Result);
+      const activePositions = referenceCrop.checked
+        ? selectedPositions
+        : fullPositions;
+      const clusters = experimentalClusters.checked
+        ? experimentalClusterResult(selectedPositions, clusterSettings())
+        : null;
+      renderPoints(activePositions);
+      renderClusters(clusters);
+      renderStage3Bounds(stage3Result);
+      renderAutoGradePath(stage3Result);
+      renderReferenceProfile(stage3Result);
+      renderFloorGrid(stage3Result);
+      grid.visible = grid.visible && floorGridToggle.checked;
+      renderCandidateAudit();
+      renderPersonMarkers();
+      updateStatus(manifest.frames[currentIndex], activePositions.length / 3, referenceCrop.checked ? margins : null, referenceCrop.checked ? effective : null, clusters, stage3Result);
+    }
+    function updateStatus(frame, visibleCount, cropMargins, effectiveBounds, clusters, stage3Result) {
+      const closest = frame.closest_return_distance_m === null ? 'нет' : frame.closest_return_distance_m.toFixed(3) + ' м*';
+      const filter = cropMargins !== null
+        ? '<br><span class="warning">Фильтр относительно местного пола и оси пути. Отступы справа (X−) / слева (X+) / сверху / снизу: ' + cropMargins.left.toFixed(1) + ' / ' + cropMargins.right.toFixed(1) + ' / ' + cropMargins.top.toFixed(1) + ' / ' + cropMargins.bottom.toFixed(1) + ' м. Снизу — от уровня местного пола; сверху — от верха профиля. Вне опорных участков используется линейная гипотеза уклона, при отсутствии профиля точки сохраняются. Это визуальный фильтр.</span>'
+        : '';
+      const clusterStatus = clusters === null
+        ? ''
+        : '<br><span class="warning">Экспериментальные кластеры внутри UNCONFIRMED X/Z-band: ' + clusters.clusterCount + '; подсвеченных точек: ' + (clusters.positions.length / 3).toLocaleString('ru-RU') + '. Это кандидаты ручного просмотра, не классификация и не решение о препятствии.</span>';
+      const railReferenceStatus = '; зелёная линия, сетка и габариты идут по общей прямой reference-оси −Y из visual contract. Это неподтверждённая визуальная гипотеза, не автоматическое распознавание рельсов и не safety decision';
+      const baselineStatus = stage3Result === undefined
+        ? ''
+        : '<br><span class="warning">Stage 3: ' + stage3Result.status + '; clusters: ' + stage3Result.clusters.length + '; distance: ' + (stage3Result.approximate_nearest_distance_m === null ? 'нет' : stage3Result.approximate_nearest_distance_m.toFixed(3) + ' м') + '. Candidate ROI: 0–' + manifest.visualization_overlay.placement_in_source_coordinates.forward_end_m.toFixed(0) + ' м; рамки есть только у кластеров-кандидатов' + railReferenceStatus + '. ASSUMED_HACKATHON, не safety decision.</span>';
+      const auditStatus = candidateAuditToggle.checked && candidateAudit
+        ? '<br><span class="warning">Audit: ' + candidateAudit.recurrent_groups.length + ' повторяемых ячеек в source coordinates для кадров ' + candidateAudit.frame_window_inclusive[0] + '–' + candidateAudit.frame_window_inclusive[1] + '. Жёлтый — повторяемая геометрия для ручного просмотра. Охват: ' + (candidateAudit.input_scope === 'FULL_CLOUD' ? 'всё облако до 200 м' : 'только кандидаты детектора') + '. Это не tracking, не доказательство неподвижности или безопасности.</span>'
+        : '';
+      status.innerHTML = '<strong>Кадр ' + frame.index + ' / ' + (manifest.frame_count - 1) + '</strong> · bag +' + frame.bag_offset_seconds.toFixed(3) + ' с<br>' +
+        'header timestamp: ' + frame.header_timestamp_ns + ' нс (связь часов не подтверждена)<br>' +
+        'точек на экране: ' + visibleCount.toLocaleString('ru-RU') + ' из ' + frame.displayed_points.toLocaleString('ru-RU') + ' valid returns; (0,0,0): ' + frame.zero_xyz_returns.toLocaleString('ru-RU') + '<br>' +
+        'ближайший валидный возврат ||xyz||: ' + closest + ' <span class="muted">*только по гипотезе метров; не расстояние до препятствия</span>' + filter + clusterStatus + baselineStatus + auditStatus;
+    }
+    async function showFrame(index) {
+      index = Math.max(0, Math.min(manifest.frame_count - 1, index));
+      const myRequest = ++requestNumber;
+      try {
+        status.textContent = 'Загрузка кадра ' + index + '…';
+        const positions = await positionsFor(index);
+        if (myRequest !== requestNumber) return;
+        fullPositions = positions; currentIndex = index; range.value = index; frameOutput.value = index; renderCurrentFrame();
+      } catch (err) { fail(err.message); }
+    }
+    function pause() { playing = false; clearTimeout(timer); playButton.textContent = '▶ Запуск'; }
+    async function selectPerson(id, first, last, example) {
+      pause(); personToSelect = {id,first,last}; stage3Overlay.checked = true;
+      if (currentIndex < first || currentIndex > last) await showFrame(example);
+      else renderCurrentFrame();
+      peopleStatus.textContent = id + ': щёлкните прямо по точкам человека. Рамка не требуется. Белая отметка покажет выбранную точку.';
+    }
+    function renderPersonMarkers() {
+      for (const marker of personMarkers) {
+        scene.remove(marker); marker.geometry.dispose(); marker.material.dispose();
+      }
+      personMarkers = [];
+      for (const annotation of Object.values(peopleAnnotations)) {
+        if (annotation.frame_index !== currentIndex || !annotation.anchor_source_coordinates) continue;
+        const p = annotation.anchor_source_coordinates;
+        const marker = new THREE.Mesh(new THREE.SphereGeometry(0.2,12,8),
+          new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,depthTest:false,depthWrite:false}));
+        marker.position.set(p.x,p.y,p.z); marker.renderOrder = 2;
+        scene.add(marker); personMarkers.push(marker);
+      }
+    }
+    function pickPerson(event) {
+      if (!personToSelect || !pickStart || Math.hypot(event.clientX-pickStart.x,event.clientY-pickStart.y)>5) return;
+      if (currentIndex < personToSelect.first || currentIndex > personToSelect.last) {
+        peopleStatus.textContent = 'Выберите кадр из интервала события.'; return;
+      }
+      const rect = renderer.domElement.getBoundingClientRect();
+      const ray = new THREE.Raycaster(); ray.params.Points.threshold = 0.2;
+      ray.setFromCamera(new THREE.Vector2(2*(event.clientX-rect.left)/rect.width-1,
+        1-2*(event.clientY-rect.top)/rect.height),camera);
+      // Pick a source return independently of detector boxes; prioritise screen proximity.
+      const hits = currentPoints ? ray.intersectObject(currentPoints,false) : [];
+      const positions = currentPoints && currentPoints.geometry.attributes.position;
+      const projected = new THREE.Vector3();
+      let hit = null, bestScore = Infinity;
+      for (const candidate of hits) {
+        projected.fromBufferAttribute(positions,candidate.index).project(camera);
+        if (projected.z < -1 || projected.z > 1) continue;
+        const px = rect.left+(projected.x+1)*rect.width/2;
+        const py = rect.top+(1-projected.y)*rect.height/2;
+        const score = Math.hypot(px-event.clientX,py-event.clientY);
+        if (score <= 8 && score < bestScore) { hit=candidate; bestScore=score; }
+      }
+      if (!hit) { peopleStatus.textContent = 'Точка не выбрана. Приблизьте человека и нажмите на его голубые точки.'; return; }
+      const frame = manifest.frames[currentIndex];
+      const anchor = {x:positions.getX(hit.index),y:positions.getY(hit.index),z:positions.getZ(hit.index)};
+      peopleAnnotations[personToSelect.id] = {
+        event_id:personToSelect.id, semantic_class:'person',
+        annotation_source:'USER_SELECTED_SOURCE_POINT',
+        independent_ground_truth:false, frame_index:currentIndex,
+        header_timestamp_ns:frame.header_timestamp_ns, source_frame:frame.source_frame,
+        anchor_source_coordinates:anchor,
+        bounds_source_coordinates:null,
+        annotation_extent:'ANCHOR_ONLY_NOT_OBJECT_BOUNDS',
+        approximate_anchor_distance_m:Math.hypot(anchor.x,anchor.y,anchor.z)
+      };
+      renderPersonMarkers();
+      peopleStatus.textContent = personToSelect.id + ': отмечена точка человека, кадр ' + currentIndex +
+        ', ' + Math.hypot(anchor.x,anchor.y,anchor.z).toFixed(1) + ' м. Выбрано ' + Object.keys(peopleAnnotations).length + '/2. Можно выбрать повторно, если белая отметка не на человеке.';
+      personToSelect = null;
+      exportPeople.disabled = Object.keys(peopleAnnotations).length === 0;
+    }
+    document.getElementById('label-person-1').addEventListener('click',()=>selectPerson('OBS-002',0,90,45));
+    document.getElementById('label-person-2').addEventListener('click',()=>selectPerson('OBS-003',150,170,160));
+    renderer.domElement.addEventListener('pointerdown',event=>{pickStart={x:event.clientX,y:event.clientY};});
+    renderer.domElement.addEventListener('pointerup',pickPerson);
+    exportPeople.addEventListener('click',()=>{
+      const payload = {dataset:manifest.dataset,first_header_timestamp_ns:manifest.frames[0].header_timestamp_ns,
+        purpose:'DEVELOPMENT_PERSON_ANCHORS_NOT_FULL_GROUND_TRUTH', events:Object.values(peopleAnnotations)};
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+      const link = document.createElement('a'); link.href=url; link.download='two_people_annotations.json';
+      link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+    function scheduleNext() {
+      if (!playing) return;
+      if (currentIndex >= manifest.frame_count - 1) { pause(); return; }
+      const dt = Math.max(0.02, manifest.frames[currentIndex + 1].bag_offset_seconds - manifest.frames[currentIndex].bag_offset_seconds);
+      timer = setTimeout(async () => { await showFrame(currentIndex + 1); scheduleNext(); }, dt * 1000 / Number(speed.value));
+    }
+    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+    playButton.addEventListener('click', () => { if (playing) { pause(); } else { playing = true; playButton.textContent = '❚❚ Пауза'; scheduleNext(); } });
+    previous.addEventListener('click', () => { pause(); showFrame(currentIndex - 1); });
+    next.addEventListener('click', () => { pause(); showFrame(currentIndex + 1); });
+    range.addEventListener('input', () => { pause(); showFrame(Number(range.value)); });
+    view.addEventListener('change', () => setView(view.value));
+    referenceCrop.addEventListener('change', renderCurrentFrame);
+    Object.values(referenceCropMargins).forEach(input => input.addEventListener('change', renderCurrentFrame));
+    experimentalClusters.addEventListener('change', renderCurrentFrame);
+    clusterVoxel.addEventListener('change', renderCurrentFrame);
+    clusterMinPoints.addEventListener('change', renderCurrentFrame);
+    stage3Overlay.addEventListener('change', renderCurrentFrame);
+    protrusionOverlay.addEventListener('change', renderCurrentFrame);
+    candidateAuditToggle.addEventListener('change', renderCurrentFrame);
+    trainVolumeToggle.addEventListener('change', renderCurrentFrame);
+    marginVolumeToggle.addEventListener('change', renderCurrentFrame);
+    floorGridToggle.addEventListener('change', renderCurrentFrame);
+    fetch('manifest.json', {cache: 'no-store'}).then(r => { if (!r.ok) throw new Error('manifest.json не найден: сначала запустите подготовку плеера.'); return r.json(); }).then(async data => {
+      if (data.format !== 'lidar-mosmetro3d.xyzf' || data.point_encoding.decimation !== 'NONE' || data.safety_decision_permitted || !data.visualization_crop || data.visualization_crop.status !== 'UNCONFIRMED' || data.visualization_crop.safety_decision_permitted || data.visualization_crop.longitudinal_filter !== 'NONE' || !data.visualization_crop.margins_m) throw new Error('Некорректный или небезопасный manifest плеера.');
+      manifest = data; stage3Overlay.disabled = !data.stage_3_baseline_attached; if (stage3Overlay.disabled) stage3Overlay.checked = false; for (const [side, input] of Object.entries(referenceCropMargins)) input.value = data.visualization_crop.margins_m[side]; range.max = data.frame_count - 1; document.getElementById('overlay-label').textContent = data.visualization_overlay.label; await loadCandidateAudit(); setView('forward'); showFrame(0);
+    }).catch(err => fail(err.message));
+    animate();
+  })();
+  </script>
+</body>
+</html>

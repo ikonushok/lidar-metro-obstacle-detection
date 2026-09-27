@@ -1,0 +1,9 @@
+{
+  "forward_min": 0, "forward_max": 200, "search_half_width": 1.9,
+  "floor_half_width": 1.8, "floor_forward_max": 60, "floor_bin": 10,
+  "floor_quantile": 0.1, "floor_min_points": 200, "floor_min_bins": 4,
+  "max_grade": 0.1, "max_residual": 0.4,
+  "min_height": 0.35, "max_height": 2.8,
+  "voxel": 0.2, "min_points": 5, "max_horizontal_extent": 3,
+  "max_voxels": 50000
+}

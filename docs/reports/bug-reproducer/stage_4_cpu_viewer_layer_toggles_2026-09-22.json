@@ -1,0 +1,27 @@
+{
+  "label": "FIX_PROVEN",
+  "date": "2026-09-22",
+  "scope": "Stage 4 C++ CPU viewer layer toggles",
+  "bug": "Viewer did not expose independent controls for the core envelope boundary and the expanded +0.5 m warning boundary.",
+  "reproduction": {
+    "command": "node --test tests/test_cpu_viewer_envelope_geometry.cjs",
+    "before_fix": "FAILED: viewer can toggle core and expanded envelope boundaries independently",
+    "after_fix": "PASSED: 3/3 tests"
+  },
+  "changed_files": [
+    "web/stage_4_cpu_viewer.html",
+    "web/stage_4_cpu_player.js",
+    "web/stage_4_cpu_player_controls.js",
+    "tests/test_cpu_viewer_envelope_geometry.cjs"
+  ],
+  "verification": [
+    "node --test tests/test_cpu_viewer_envelope_geometry.cjs: pass",
+    "node --check web/stage_4_cpu_player.js: pass",
+    "node --check web/stage_4_cpu_player_controls.js: pass",
+    "node --test tests/test_player_playback.cjs: pass",
+    "Live localhost:8099 DOM check: old marks-layer and train-layer absent; core-envelope-layer and margin-envelope-layer present; margin envelope toggles independently"
+  ],
+  "not_verified": [
+    "Python stage_4_all_sources_contract test could not be run because Python is unavailable/broken in the current sandbox"
+  ]
+}

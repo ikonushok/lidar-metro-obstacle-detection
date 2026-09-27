@@ -1,0 +1,28 @@
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+
+ARG ROS_DISTRO=humble
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=${ROS_DISTRO}
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release \
+    && curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+       ros-humble-ros-base ros-humble-rosbag2-storage-default-plugins \
+       python3-colcon-common-extensions ffmpeg libjs-three python3-numpy python3-matplotlib \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY src/ /app/src/
+COPY scripts/ /app/scripts/
+COPY tests/ /app/tests/
+COPY config/ /app/config/
+COPY web/ /app/web/
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && colcon build --merge-install \
+    --cmake-args -DLIDAR_ENABLE_CUDA=ON --base-paths /app/src/lidar_mosmetro3d_cpp
+RUN chmod +x /app/scripts/ros_entrypoint.sh
+
+ENV AMENT_PREFIX_PATH=/app/install
+ENV PYTHONPATH=/app/src MPLBACKEND=Agg FASTRTPS_DEFAULT_PROFILES_FILE=/app/config/fastdds.xml
+ENTRYPOINT ["/app/scripts/ros_entrypoint.sh"]
+CMD ["python3", "/app/scripts/audit_bag.py", "--help"]

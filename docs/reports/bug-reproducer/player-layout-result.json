@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "status": "FIX_PROVEN",
+  "reason": "The same reproducer changed from failing to passing and broader checks passed.",
+  "reproduction": "confirmed",
+  "full_suite": "passed",
+  "same_command": true,
+  "before": {
+    "schema_version": 1,
+    "label": "reproduced",
+    "captured_at": "2026-09-20T00:00:00Z",
+    "command": [
+      "node",
+      "--test",
+      "tests/test_player_layout.cjs"
+    ],
+    "cwd": "C:\\Users\\Ilya\\PycharmProjects\\lidar_MosMetro3D",
+    "runtime": "Node.js local test environment",
+    "duration_ms": 81.686,
+    "exit_code": 1,
+    "timed_out": false,
+    "stdout": "FAIL: review controls are a permanently visible fixed-height sidebar, not a disclosure in header flow. Assertion: opening review controls must not change header height or shrink the point-cloud scene. The production HTML contained <details id=\"review-tools\">.",
+    "stderr": "",
+    "stdout_truncated": false,
+    "stderr_truncated": false,
+    "secrets_redacted": true
+  },
+  "after": {
+    "schema_version": 1,
+    "label": "fixed",
+    "captured_at": "2026-09-20T01:13:07.402128+00:00",
+    "command": [
+      "node",
+      "--test",
+      "tests/test_player_layout.cjs"
+    ],
+    "cwd": "C:\\Users\\Ilya\\PycharmProjects\\lidar_MosMetro3D",
+    "runtime": "Python 3.12.14 on Windows AMD64",
+    "duration_ms": 145.455,
+    "exit_code": 0,
+    "timed_out": false,
+    "stdout": "\u2714 review controls are a permanently visible fixed-height sidebar, not a disclosure in header flow (1.0049ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.4531\n",
+    "stderr": "",
+    "stdout_truncated": false,
+    "stderr_truncated": false,
+    "secrets_redacted": true
+  }
+}

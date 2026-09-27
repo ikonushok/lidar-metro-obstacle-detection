@@ -1,0 +1,75 @@
+schema_version: 1
+experiment_id: stage5_real_synthetic_no100_causal_v1_20260925
+status: DEVELOPMENT_PROTOCOL_NO_RUNTIME_CHANGE
+baseline: candidate_baseline_v2 + causal_runtime
+temporal_policy: frozen_current_runtime_causal_policy_do_not_retrain
+metric_rule: negative_UNKNOWN_counts_as_FP_without_changing_runtime_UNKNOWN_not_CLEAR
+
+real_development:
+  positive_regression:
+    source_id: doubleT_obstacle
+    frames: [13, 64]
+    expected_detected_frames: 52
+    note: known positive regression only, not independent real-world recall
+  hard_negative_source:
+    source_id: new_data
+    bag_offset_seconds: [0, 600)
+    forbidden_to_use_after_seconds: 600
+  calibration_sources:
+    - source_id: doubleT_obstacle
+    - source_id: new_data
+      bag_offset_seconds: [0, 600)
+
+real_test:
+  new_data_bag_offset_seconds: [600, end)
+  other_real_sources:
+    - roundT_doubleT
+    - squareT_platform_squareT_switch
+    - doubleT_platform
+    - roundT_squareT_pressureGate_squareT
+    - roundT_pressureGate_roundT
+  forbidden_for_training:
+    - hard_negative_mining
+    - threshold_selection
+    - hyperparameter_selection
+
+synthetic_train:
+  dataset_version: synthetic_obstacles_stage5_no100_causal_train_v1_20260925
+  source_windows:
+    - source_id: doubleT_obstacle
+      first_frame: 0
+      count: 8
+  split_policy: all_train
+  scenarios:
+    - standing_person
+    - lying_person
+    - dog_standing
+    - dog_lying
+    - suitcase
+    - low_box
+    - crowbar
+    - shovel
+    - jacket_bundle
+    - pipe_across_track
+    - cable
+    - maintenance_trolley
+  distances_m: [10, 30, 60]
+  zones: [center, left_boundary, right_boundary]
+  expected_placements: 864
+  minimum_structure: 3 CORE-relative zones x 8 source-frame/background groups per class-distance
+  excluded_distance_m:
+    - 100
+  exclusion_reason: current lidar/synthetic pipeline did not produce trainable CORE-positive components at 100 m
+  visibility_rule: zero synthetic returns is visibility_failure_not_FN_not_positive_train
+
+candidates:
+  - candidate_baseline_v2 + causal_runtime
+  - random_forest + causal_runtime
+  - gradient_boosting + causal_runtime
+  - lightgbm + causal_runtime
+
+validation:
+  development_selection: real development only; no real test frames for hard-negative mining or threshold selection
+  final_training: allowed real development components plus synthetic_train
+  compare_against: candidate_baseline_v2 + same causal_runtime
+  reject_policy: save rejected candidate and do not integrate into C++/ROS2 runtime

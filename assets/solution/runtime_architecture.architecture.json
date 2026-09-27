@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Два входа в общее C++ ядро",
+    "quality_profile": "showcase",
+    "viewBox": [1380, 760]
+  },
+  "components": [
+    { "id": "archives", "type": "database", "label": "ROS2 bag archives", "sublabel": "for_hackathon + new_data", "pos": [70, 290], "size": [175, 72] },
+    { "id": "direct", "type": "frontend", "label": "Direct CPU player", "sublabel": "archive -> XYZ -> stdin/stdout", "pos": [310, 130], "size": [205, 74], "tag": "analysis" },
+    { "id": "rosplay", "type": "external", "label": "ros2 bag play", "sublabel": "PointCloud2 stream", "pos": [310, 450], "size": [205, 74], "tag": "handoff" },
+    { "id": "core", "type": "backend", "label": "C++ geometry core", "sublabel": "AutoRails -> tangent -> CORE", "pos": [570, 130], "size": [215, 74], "tag": "shared" },
+    { "id": "node", "type": "backend", "label": "curve_envelope_node", "sublabel": "ROS2 String / JSON", "pos": [570, 450], "size": [215, 74] },
+    { "id": "model", "type": "security", "label": "ApplyCandidateBaselineV2", "sublabel": "forest-lite obstacle/noise", "pos": [850, 130], "size": [250, 74] },
+    { "id": "contract", "type": "security", "label": "Diagnostics contract", "sublabel": "UNKNOWN, safety=false", "pos": [850, 450], "size": [230, 74] },
+    { "id": "viewer", "type": "frontend", "label": "HTTP/WebGL viewer", "sublabel": "visual review", "pos": [1130, 130], "size": [175, 74] },
+    { "id": "topic", "type": "messagebus", "label": "Output topic", "sublabel": "/stage_3/... JSON", "pos": [1130, 450], "size": [175, 74] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Исследование записей", "wraps": ["archives", "direct", "viewer"], "pad": 28 },
+    { "kind": "region", "label": "Headless ROS2-сдача", "wraps": ["rosplay", "node", "topic"], "pad": 28 },
+    { "kind": "security-group", "label": "Общее runtime-ядро", "wraps": ["core", "model", "contract"], "pad": 30 }
+  ],
+  "connections": [
+    { "id": "archives-to-direct", "from": "archives", "to": "direct", "label": "lazy frame read", "variant": "emphasis", "labelAt": [278, 218] },
+    { "id": "direct-to-core", "from": "direct", "to": "core", "label": "XYZ via stdin", "variant": "emphasis", "labelAt": [542, 96] },
+    { "id": "core-to-model", "from": "core", "to": "model", "label": "CORE components", "labelAt": [818, 218] },
+    { "id": "model-to-viewer", "from": "model", "to": "viewer", "label": "JSON result", "variant": "emphasis", "labelAt": [1105, 218] },
+    { "id": "archives-to-play", "from": "archives", "to": "rosplay", "label": "selected bag", "variant": "dashed", "labelAt": [252, 426] },
+    { "id": "play-to-node", "from": "rosplay", "to": "node", "label": "PointCloud2", "labelAt": [543, 538] },
+    { "id": "node-to-core", "from": "node", "to": "core", "label": "same core", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelDx": -78 },
+    { "id": "node-to-topic", "from": "node", "to": "topic", "label": "std_msgs/String", "fromSide": "right", "toSide": "left", "via": [[820, 487], [820, 610], [1120, 610], [1120, 487]], "labelAt": [970, 626] },
+    { "id": "model-to-contract", "from": "model", "to": "contract", "label": "candidate only", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [910, 222] },
+    { "id": "contract-to-topic", "from": "contract", "to": "topic", "label": "diagnostics", "variant": "security", "labelAt": [1100, 426] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Direct path", "items": ["Плеер не гоняет кадры через DDS", "Один кадр -> один C++ JSON"] },
+    { "dot": "emerald", "title": "ROS2 path", "items": ["Заказчик может запустить ros2 bag play", "Результат публикуется как String/JSON"] },
+    { "dot": "rose", "title": "Общий контракт", "items": ["Оба входа используют одно ядро и candidate_baseline_v2", "UNKNOWN и safety=false сохраняются"] }
+  ]
+}

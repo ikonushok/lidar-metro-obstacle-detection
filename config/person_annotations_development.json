@@ -1,0 +1,52 @@
+{
+  "dataset": "doubleT_obstacle",
+  "first_header_timestamp_ns": "946687297199933052",
+  "purpose": "DEVELOPMENT_USER_REVIEWED_CANDIDATE_NOT_INDEPENDENT_GROUND_TRUTH",
+  "events": [
+    {
+      "event_id": "OBS-002",
+      "semantic_class": "person",
+      "annotation_source": "USER_SELECTED_DETECTOR_CANDIDATE",
+      "frame_index": 55,
+      "header_timestamp_ns": "946687302700111985",
+      "source_frame": "lidar_livox",
+      "cluster_index": 75,
+      "bounds_source_coordinates": {
+        "x": {"min": -1.639460563659668, "max": -0.8692284822463989},
+        "y": {"min": -56.95723342895508, "max": -56.08494186401367},
+        "z": {"min": -2.7058398723602295, "max": -1.0461443662643433}
+      },
+      "approximate_nearest_distance_m": 56.14000701904297,
+      "independent_ground_truth": false
+    }
+  ],
+  "point_annotations": [
+    {
+      "event_id": "OBS-002",
+      "annotation_source": "USER_SELECTED_SOURCE_POINT",
+      "frame_index": 55,
+      "header_timestamp_ns": "946687302700111985",
+      "source_frame": "lidar_livox",
+      "anchor_source_coordinates": {"x": -1.3050981760025024, "y": -56.34038162231445, "z": -1.1873599290847778},
+      "approximate_anchor_distance_m": 56.36800250317754
+    },
+    {
+      "event_id": "OBS-003",
+      "annotation_source": "USER_SELECTED_SOURCE_POINT",
+      "frame_index": 160,
+      "header_timestamp_ns": "946687313300083041",
+      "source_frame": "lidar_livox",
+      "anchor_source_coordinates": {"x": 1.791092872619629, "y": -3.4157321453094482, "z": -0.5219449400901794},
+      "approximate_anchor_distance_m": 3.892000293850819
+    }
+  ],
+  "pending_events": [
+    {
+      "event_id": "OBS-003",
+      "user_observed_frame": 170,
+      "status": "SOURCE_POINT_RECEIVED_FRAME_160_FULL_EXTENT_PENDING",
+      "rejected_import": {"frame_index": 160, "cluster_index": 2,
+        "reason": "User says only person 1 annotated; imported candidate spans approximately 38m and is not an individual person annotation."}
+    }
+  ]
+}

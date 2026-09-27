@@ -1,0 +1,13 @@
+# Python runtime dependencies used by src/ and scripts/.
+# The Dockerfile installs the matching Ubuntu 22.04 packages with APT; this file
+# also supports local pip environments for development and unit tests.
+numpy>=1.21.0
+matplotlib>=3.5.0
+scikit-learn>=0.23.2
+lightgbm>=4.5.0
+
+# ROS 2 dependencies are intentionally not listed as pip packages.  They are
+# supplied by ros:humble-ros-base-jammy and APT in Dockerfile:
+# ros-humble-ros-base, ros-humble-rosbag2-storage-default-plugins.
+# Dockerfile installs scikit-learn from Ubuntu APT and LightGBM from pip because
+# Ubuntu 22.04 does not provide a python3-lightgbm package in the base archives.

@@ -1,0 +1,44 @@
+{
+  "title": "Раскрытие слоёв сжимало область облака",
+  "project": "lidar_MosMetro3D",
+  "generated_at": "2026-09-20",
+  "mode": "prove-fix",
+  "original_report": "Пользователь сообщил: раскрытие «Точки, измерения и слои» уменьшает окно отрисовки; панель должна быть всегда открыта, а облако — большим.",
+  "discovery_scope": [
+    "C:/Users/Ilya/PycharmProjects/lidar_MosMetro3D/web/stage_2_raw_player.html",
+    "C:/Users/Ilya/PycharmProjects/lidar_MosMetro3D/tests/test_player_layout.cjs"
+  ],
+  "candidates": [
+    {
+      "candidate": "Раскрываемая панель находится в потоке header и изменяет высоту #scene",
+      "location": "C:/Users/Ilya/PycharmProjects/lidar_MosMetro3D/web/stage_2_raw_player.html:57",
+      "contract": "Панель всегда видима и не уменьшает область облака.",
+      "trigger": "Открыть «Точки, измерения и слои».",
+      "confidence": "high",
+      "outcome": "REPRODUCED"
+    }
+  ],
+  "expected": "Панель видна постоянно справа; canvas занимает всю оставшуюся высоту workspace.",
+  "actual": "<details> внутри header увеличивал высоту шапки и уменьшал scene.",
+  "environment": "Node.js test runner и localhost player.",
+  "reproduction": "Статический UI-тест проверяет отсутствие details и наличие фиксированной grid-области.",
+  "failure_signal": "До исправления test_player_layout.cjs завершался с exit 1 на assertions о details.",
+  "root_cause": "review-tools был раскрываемым элементом внутри header во flex-потоке страницы.",
+  "fix_summary": "Панель заменена на постоянный aside в #workspace; body использует grid, #scene занимает minmax(0, 1fr).",
+  "why_causal": "aside вынесен из header, поэтому раскрытие больше невозможно и не может менять высоту header.",
+  "reproduction_files": [
+    {"path": "C:/Users/Ilya/PycharmProjects/lidar_MosMetro3D/tests/test_player_layout.cjs", "line": 1, "summary": "Регрессионный тест Gate 1."}
+  ],
+  "fix_files": [
+    {"path": "C:/Users/Ilya/PycharmProjects/lidar_MosMetro3D/web/stage_2_raw_player.html", "line": 7, "summary": "Постоянная сетка workspace и sidebar."}
+  ],
+  "checks": [
+    {"name": "Тест компоновки", "status": "passed", "detail": "Red before, green after."},
+    {"name": "Регрессии плеера", "status": "passed", "detail": "14 тестов прошли."},
+    {"name": "Browser smoke", "status": "passed", "detail": "new_data открывается; постоянная панель справа, облако в отдельном canvas."}
+  ],
+  "reproduce": ["node --test tests/test_player_layout.cjs"],
+  "limitations": ["Проверка layout не покрывает все browser viewport sizes."],
+  "residual_risks": ["На очень узком экране sidebar занимает ширину, но не высоту canvas."],
+  "notes": ["Смысл слоёв, raw XYZ и переключение датасетов не менялись."]
+}

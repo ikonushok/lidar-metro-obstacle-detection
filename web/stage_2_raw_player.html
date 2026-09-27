@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LiDAR — габарит и пересечения</title>
+  <style>
+    :root {color-scheme:dark;font:14px system-ui;background:#07101c;color:#d9e8f5}
+    body {margin:0;height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+    header {padding:10px 16px;background:#101d2d;max-height:30vh;overflow:auto}
+    h1 {font-size:18px;margin:0 0 10px}
+    .controls {display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    button,select,input {font:inherit;accent-color:#69d8ef}
+    button,select {padding:6px 10px;background:#203247;color:inherit;border:1px solid #486079;border-radius:5px}
+    label {display:flex;align-items:center;gap:6px}
+    #frame-range {width:min(32vw,420px)}
+    #workspace {min-height:0;display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,25vw,390px);overflow:hidden}
+    #scene {min-height:0;position:relative;overflow:hidden}
+    canvas {display:block;width:100%;height:100%}
+    #status {padding:10px 16px;height:4.5em;flex-shrink:0;overflow:auto;line-height:1.5;white-space:pre-wrap;font-variant-numeric:tabular-nums;background:#101d2d}
+    #auto-status {flex:1;min-width:14em;height:3em;line-height:1.5;overflow:auto}
+    #live-status {height:4.5em;line-height:1.5;overflow:auto}
+    #load-status,#error {position:absolute;left:12px;right:12px;z-index:2;pointer-events:none;white-space:pre-wrap;background:#101d2de6}
+    #load-status {top:8px;color:#ffdc91}
+    #error {bottom:8px;color:#ffaaaa}
+    .note {margin-top:10px;color:#aabed2;font-size:12px}
+    #review-tools {min-height:0;overflow:auto;padding:10px 14px;border-left:1px solid #304257;background:#0b1726}
+    #review-tools h2 {margin:0 0 8px;font-size:15px;color:#8edcea}
+    .tools {padding:0 2px}
+    .tools .controls {margin:8px 0}
+    .tools input[type=number] {width:65px}
+    .tools input[type=text] {width:120px}
+    .legend {margin:12px 0;padding:8px;border:1px solid #304257;border-radius:5px;color:#c7d8e8;font-size:12px}
+    .legend h3 {margin:0 0 6px;font-size:13px;color:#8edcea}
+    .legend-row {display:flex;align-items:center;gap:7px;margin:4px 0}
+    .swatch {width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+    .swatch.raw {background:#69d8ef}.swatch.axis {background:#3dff6f}.swatch.support {background:#ffb74d}
+    .swatch.envelope {background:#987fff}.swatch.core {background:#ff3f58}.swatch.margin {background:#ffc34d}
+    #review-message {color:#ffdc91;white-space:pre-wrap}
+    #annotations {padding-left:20px;font-size:12px;max-height:90px;overflow:auto}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Габарит и пересечения · текущий кадр</h1>
+    <div class="controls">
+      <label>Датасет <select id="dataset-select" disabled><option>Текущая запись</option></select></label>
+      <button id="play" disabled>▶ Запуск</button>
+      <button id="previous" disabled>◀</button>
+      <label>Кадр <input id="frame-range" type="range" min="0" max="0" value="0" disabled><output id="frame-output">0</output></label>
+      <button id="next" disabled>▶</button>
+      <label>Скорость <select id="speed"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option><option>4</option></select>×</label>
+      <label>Вид <select id="view"><option value="forward">Вдоль −Y</option><option value="top">Сверху</option><option value="side">Сбоку</option><option value="free">Общий</option></select></label>
+      <button id="reset">Сбросить камеру</button>
+      <label>Размер точек <input id="point-size" type="range" min="1" max="4" step="0.5" value="1.5"></label>
+    </div>
+    <div class="controls" style="margin-top:10px">
+      <label>Ось <select id="axis-mode"><option value="auto">Автоматически по рельсам</option><option value="manual">Ручные 4 точки</option><option value="off">Без разметки</option></select></label>
+      <span id="auto-status" role="status">Поиск рельсов…</span>
+    </div>
+    <div id="live-status" class="note" role="status" hidden></div>
+    <div id="object-status" class="note" role="status" hidden></div>
+  </header>
+  <main id="workspace">
+    <div id="scene"><div id="load-status" role="status"></div><div id="error" role="alert"></div></div>
+    <aside id="review-tools" aria-label="Точки, измерения и слои">
+      <h2>Точки, измерения и слои</h2>
+      <div class="tools">
+        <div class="controls">
+          <label>Метка <input id="mark-label" type="text" maxlength="80" value="Объект"></label>
+          <button id="pick-point">Выбрать точку</button><button id="pick-measure">Измерить 2 точки</button>
+          <button id="pick-rails">Ось: 4 точки рельсов</button><button id="cancel-pick" disabled>Отмена выбора</button>
+        </div>
+        <div id="review-message" role="status"></div>
+        <div class="controls">
+          <label><input id="marks-layer" type="checkbox">Отметки и измерения</label>
+          <label style="color:#3dff6f"><input id="axis-layer" type="checkbox" checked disabled>Ось и опоры рельсов</label>
+          <label><input id="rail-grid" type="checkbox" checked disabled>Уровень рельсов и шкала</label>
+          <label style="color:#987fff"><input id="train-layer" type="checkbox" checked disabled>Габарит</label>
+          <label style="color:#e8ceff"><input id="margin-layer" type="checkbox" disabled>Габарит с отступами</label>
+        </div>
+        <div id="axis-info" hidden></div>
+        <div class="controls">
+          <label>Слева, м* <input id="margin-left" type="number" min="0" max="10" step="0.1" value="0.5"></label>
+          <label>Справа, м* <input id="margin-right" type="number" min="0" max="10" step="0.1" value="0.5"></label>
+          <label>Сверху, м* <input id="margin-top" type="number" min="0" max="10" step="0.1" value="0.5"></label>
+          <label>Снизу, м* <input id="margin-bottom" type="number" min="0" max="10" step="0.1" value="0.5"></label>
+          <label><input id="crop-layer" type="checkbox" disabled>Показывать внутри габарита с отступами</label>
+        </div>
+        <div class="controls">
+          <label><input id="live-layer" type="checkbox" checked>Пересечения текущего габарита</label>
+          <button id="export-live" disabled>Экспорт расчёта кадра JSON</button>
+        </div>
+        <div id="live-details" hidden></div>
+        <section class="legend" aria-label="Легенда цветов и расстояний">
+          <h3>Легенда</h3>
+          <div class="legend-row"><span class="swatch raw"></span>Исходные точки</div>
+          <div class="legend-row"><span class="swatch axis"></span>Ось пути</div>
+          <div class="legend-row"><span class="swatch support"></span>Опоры рельсов</div>
+          <div class="legend-row"><span class="swatch envelope"></span>Габарит поезда</div>
+          <div class="legend-row"><span class="swatch core"></span>Точки внутри габарита</div>
+          <div class="legend-row"><span class="swatch margin"></span>Точки в отступах</div>
+          <div class="note"><b>Цифры на шкале</b> — расстояние по оси в м*. Расстояние в статусе — прямая от датчика до ближайшего возврата в source XYZ; единицы и положение датчика пока ASSUMED. Цвета обозначают геометрию, не класс объекта.</div>
+        </section>
+        <div class="controls"><label><input id="object-layer" type="checkbox" checked>Объектные кандидаты — весь поисковый участок</label></div>
+        <div id="object-info" hidden></div>
+        <div class="controls">
+          <button id="raw-only">Чистое облако</button><button id="clear-frame">Удалить отметки кадра</button>
+          <button id="import-review">Импорт оси JSON</button><input id="import-review-file" type="file" accept="application/json" hidden>
+          <button id="export-review" disabled>Экспорт отметок JSON</button>
+        </div>
+        <ul id="annotations" hidden></ul><div id="layer-info" hidden></div>
+      </div>
+    </aside>
+  </main>
+  <div id="status" role="status">Загрузка…</div>
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/OrbitControls.js"></script>
+  <script src="stage_2_auto_rails.js?v=auto-rails-1"></script>
+  <script src="stage_3_live_envelope.js?v=live-envelope-1"></script>
+  <script src="stage_3_objects.js?v=objects-1"></script>
+  <script src="stage_2_review_layers.js?v=membership-1"></script>
+  <script>
+  'use strict';
+  // Exported XYZ values go directly to the GPU in their original order.
+  function decodeRawFrame(buffer, expectedCount) {
+    if (buffer.byteLength % 12 !== 0 || buffer.byteLength / 12 !== expectedCount)
+      throw new Error('Размер XYZ-файла не совпадает с manifest. Кадр не показан.');
+    const positions = new Float32Array(buffer);
+    for (const value of positions) if (!Number.isFinite(value))
+      throw new Error('XYZ-файл содержит NaN/Infinity. Кадр не показан.');
+    return positions;
+  }
+  function replaceRawCloud(scene, previous, positions, material) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    if (positions.length) { geometry.computeBoundingBox(); geometry.computeBoundingSphere(); }
+    const cloud = new THREE.Points(geometry, material);
+    cloud.name = 'raw-frame';
+    if (previous) { scene.remove(previous); previous.geometry.dispose(); }
+    scene.add(cloud);
+    return cloud;
+  }
+  (() => {
+    const $ = id => document.getElementById(id);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x07101c);
+    const camera = new THREE.PerspectiveCamera(65, 1, 0.01, 1000);
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    $('scene').appendChild(renderer.domElement);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = false;
+    const material = new THREE.PointsMaterial({color:0x69d8ef,size:1.5,sizeAttenuation:false});
+    let manifest, autoConfig, liveConfig, objectConfig, cloud, current = -1, request = 0, pending, playing = false, timer;
+    const cache=new Map();
+    const review=createReviewLayers({scene,camera,canvas:renderer.domElement,pause,cloud:()=>cloud,
+      display(positions){if(cloud.geometry.attributes.position.array!==positions){
+        cloud.geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+        cloud.geometry.computeBoundingBox();cloud.geometry.computeBoundingSphere();}},
+      colors(colors){material.vertexColors=!!colors;material.color.set(colors?0xffffff:0x69d8ef);material.needsUpdate=true;
+        if(colors)cloud.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+        else cloud.geometry.deleteAttribute('color');}
+    });
+    function pause() {playing=false;clearTimeout(timer);$('play').textContent='▶ Запуск';}
+    function fail(error) {pause();$('error').textContent=error.message;}
+    function resetCamera() {
+      const bounds = cloud && cloud.geometry.boundingBox;
+      const center = bounds ? bounds.getCenter(new THREE.Vector3()) : new THREE.Vector3(0,-20,0);
+      const span = bounds ? bounds.getSize(new THREE.Vector3()) : new THREE.Vector3(10,40,10);
+      const radius = Math.max(span.length()/2, 1);
+      const verticalAngle = camera.fov*Math.PI/360;
+      const angle = Math.min(verticalAngle,Math.atan(Math.tan(verticalAngle)*camera.aspect));
+      const distance = radius/Math.sin(angle)*1.1;
+      camera.far = Math.max(1000,distance+radius*4); camera.updateProjectionMatrix();
+      camera.up.set(0,0,1);
+      if ($('view').value==='forward') {
+        camera.position.set(0,0,0);controls.target.set(0,-20,0);
+      } else {
+        controls.target.copy(center);
+        if ($('view').value==='top') {camera.up.set(0,1,0);camera.position.copy(center).add(new THREE.Vector3(0,0,distance));}
+        else if ($('view').value==='side') camera.position.copy(center).add(new THREE.Vector3(distance,0,0));
+        else camera.position.copy(center).add(new THREE.Vector3(1,0.6,0.7).normalize().multiplyScalar(distance));
+      }
+      camera.lookAt(controls.target);controls.update();
+    }
+    async function showFrame(index) {
+      index=Math.max(0,Math.min(manifest.frames.length-1,index));
+      const token=++request;
+      if(pending) pending.abort();
+      pending=new AbortController();
+      // Keep the complete displayed snapshot until the next frame is decoded.
+      // Loading text is an overlay: it must not resize the canvas or replace frame identity.
+      if(current>=0)$('frame-range').value=current;
+      $('error').textContent='';
+      $('load-status').textContent='Загрузка кадра '+index+'…'+(current>=0?' На экране кадр '+current+'.':'');
+      try {
+        let frame=manifest.frames[index];
+        if(frame.metadata_url){
+          const metaResponse=await fetch(frame.metadata_url,{signal:pending.signal});
+          if(!metaResponse.ok)throw new Error('Не удалось прочитать кадр '+index);
+          const decoded=await metaResponse.json();
+          if(decoded.index!==index)throw new Error('Несовпадение индекса кадра');
+          if(token!==request)return false;
+          frame=decoded;manifest.frames[index]=frame;
+        }
+        let positions=cache.get(index);
+        if(!positions){
+          const response=await fetch(frame.file,{signal:pending.signal});
+          if(!response.ok) throw new Error('Не удалось загрузить '+frame.file+' (HTTP '+response.status+')');
+          positions=decodeRawFrame(await response.arrayBuffer(),frame.displayed_points);
+        }
+        if(token!==request) return false;
+        cache.delete(index);cache.set(index,positions);while(cache.size>3)cache.delete(cache.keys().next().value);
+        // No await between invalidating old overlays and committing the new snapshot.
+        review.unload();
+        cloud=replaceRawCloud(scene,cloud,positions,material);
+        const first=current<0;current=index;
+        $('frame-range').value=index;$('frame-output').value=index;
+        $('status').textContent=`${manifest.dataset} · кадр ${index}/${manifest.frames.length-1} · bag +${frame.bag_offset_seconds.toFixed(3)} с\n`+
+          `${positions.length/3} / ${frame.displayed_points} точек · frame: ${frame.source_frame} · header: ${frame.header_timestamp_ns}\n`+
+          `XYZ без преобразования · нулевые возвраты: ${frame.zero_xyz_returns} · ближайшая точка: ${frame.closest_return_distance_m?.toFixed(3)??'нет'} м*`;
+        review.setFrame(frame,positions,manifest,autoConfig,liveConfig,objectConfig);
+        if(first) resetCamera();
+        $('load-status').textContent='';
+        return true;
+      } catch(error) {
+        if(token!==request || error.name==='AbortError') return false;
+        $('load-status').textContent='Кадр '+index+' не загружен.'+(current>=0?' На экране остаётся кадр '+current+'.':'');
+        fail(error);return false;
+      }
+    }
+    function schedule() {
+      if(!playing) return;
+      if(current>=manifest.frames.length-1){pause();return;}
+      const interval=manifest.frames[current+1].metadata_url?.length ? .1 :
+        manifest.frames[current+1].bag_offset_seconds-manifest.frames[current].bag_offset_seconds;
+      timer=setTimeout(async()=>{if(await showFrame(current+1))schedule();},Math.max(0,interval)*1000/Number($('speed').value));
+    }
+    $('play').onclick=()=>{if(playing){pause();return;}playing=true;$('play').textContent='❚❚ Пауза';schedule();};
+    $('previous').onclick=()=>{pause();showFrame(current-1);};
+    $('next').onclick=()=>{pause();showFrame(current+1);};
+    $('frame-range').oninput=()=>{pause();showFrame(Number($('frame-range').value));};
+    $('view').onchange=resetCamera;$('reset').onclick=resetCamera;
+    $('point-size').oninput=()=>{material.size=Number($('point-size').value);};
+    new ResizeObserver(()=>{const w=$('scene').clientWidth,h=$('scene').clientHeight;
+      camera.aspect=w/Math.max(h,1);camera.updateProjectionMatrix();renderer.setSize(w,h);
+    }).observe($('scene'));
+    function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);} animate();
+    async function loadDataset(){
+      let manifestUrl='manifest.json';
+      try{
+        const response=await fetch('/datasets.json',{cache:'no-store'}),catalog=response.ok?await response.json():null;
+        if(Array.isArray(catalog)&&catalog.length){
+          const selected=new URLSearchParams(location.search).get('dataset')||'doubleT_obstacle';
+          const entry=catalog.find(d=>d.id===selected);
+          if(!entry)throw new Error('Неизвестный датасет: '+selected);
+          manifestUrl=entry.manifest;
+          const selector=$('dataset-select');selector.replaceChildren();
+          for(const d of catalog){const option=document.createElement('option');option.value=d.id;option.textContent=d.label;selector.appendChild(option);}
+          selector.value=selected;selector.disabled=false;
+          selector.onchange=()=>{const next=selector.value;selector.value=selected;pause();location.assign('/?dataset='+encodeURIComponent(next)+'&v=datasets-1');};
+        }
+      }catch(error){if(error.message.startsWith('Неизвестный датасет'))throw error;}
+      return fetch(manifestUrl,{cache:'no-store'});
+    }
+    loadDataset().then(async response=>{
+      if(!response.ok)throw new Error('manifest.json недоступен');
+      manifest=await response.json();
+      try{const configResponse=await fetch('stage_2_auto_rails_config.json',{cache:'no-store'});
+        if(configResponse.ok)autoConfig=await configResponse.json();}catch(_){autoConfig=null;}
+      try{const configResponse=await fetch('stage_3_live_envelope_config.json',{cache:'no-store'});
+        if(configResponse.ok)liveConfig=await configResponse.json();}catch(_){liveConfig=null;}
+      try{const configResponse=await fetch('stage_3_objects_config.json',{cache:'no-store'});
+        if(configResponse.ok)objectConfig=await configResponse.json();}catch(_){objectConfig=null;}
+        if(manifest.geometry_enabled===false){
+        autoConfig=null;liveConfig=null;objectConfig=null;$('axis-mode').value='off';
+        $('axis-mode').disabled=true;$('view').value='free';
+        const notice=document.createElement('div');notice.className='note';
+        notice.textContent='Новая запись: оси и габарит не подтверждены, автоматическая геометрия выключена. Архив читается по запросу; воспроизведение — номинально 10 Гц плюс загрузка, исходное время показано внизу.';
+          $('status').before(notice);
+        }
+        if(manifest.geometry_notice){
+          const notice=document.createElement('div');notice.className='note';
+          notice.textContent=manifest.geometry_notice;$('status').before(notice);
+        }
+      if(manifest.format!=='lidar-mosmetro3d.xyzf'||manifest.format_version!==1||
+         manifest.point_encoding.decimation!=='NONE'||manifest.point_encoding.bytes_per_point!==12||
+         !manifest.frames.length)throw new Error('Неподдерживаемый формат полного XYZ export');
+      $('frame-range').max=manifest.frames.length-1;
+      if(await showFrame(0)) for(const id of ['play','previous','next','frame-range']) $(id).disabled=false;
+    }).catch(fail);
+  })();
+  </script>
+</body>
+</html>

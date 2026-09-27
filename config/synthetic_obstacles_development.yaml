@@ -1,0 +1,176 @@
+# Development-only synthetic geometry in the observed lidar_livox source frame.
+# Values use the project's ASSUMED_HACKATHON metre/axis hypothesis. They are not
+# calibration evidence and must not be used for a CLEAR or safety decision.
+schema_version: 1
+status: SYNTHETIC_DEVELOPMENT_ONLY
+source_frame: lidar_livox
+target_from_source: lidar_livox <- lidar_livox
+units: m
+sensor_origin_xyz: [0.0, 0.0, 0.0]
+minimum_range_m: 0.20
+occlusion_epsilon_m: 0.000001
+random_seed: 20260922
+dropout_probability: 0.0
+safety_decision_permitted: false
+clear_decision_permitted: false
+
+# Geometry-only default. A constant value makes synthetic returns easy to audit,
+# but it is not a calibrated Livox/Hesai reflectivity model.
+intensity:
+  mode: constant
+  value: 30.0
+
+scenario_selection:
+  # With no --scenario-id the stream changes scenario every 20 source frames.
+  # The selected scenario id is always written to ground truth.
+  mode: cycle
+  frames_per_scenario: 20
+  default_scenario_id: standing_person
+
+# Dimensions and placements are synthetic development assumptions, not measured
+# object models or acceptance thresholds. Each scenario contains one semantic
+# object; multi-part geometry receives one object-level ground-truth id.
+scenarios:
+  - id: standing_person
+    label: Standing person proxy
+    objects:
+      - id: person
+        category: PERSON
+        pose: STANDING
+        parts:
+          - {id: head, shape: ellipsoid, center_xyz: [0.0, -12.0, 1.70], radii_xyz: [0.15, 0.16, 0.17]}
+          - {id: torso, shape: ellipsoid, center_xyz: [0.0, -12.0, 1.15], radii_xyz: [0.28, 0.20, 0.46]}
+          - {id: left_leg, shape: cylinder, center_xyz: [-0.12, -12.0, 0.45], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.09, length_m: 0.90}
+          - {id: right_leg, shape: cylinder, center_xyz: [0.12, -12.0, 0.45], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.09, length_m: 0.90}
+
+  - id: lying_person
+    label: Person lying across the track
+    objects:
+      - id: person
+        category: PERSON
+        pose: LYING
+        parts:
+          - {id: head, shape: ellipsoid, center_xyz: [-0.72, -18.0, 0.30], radii_xyz: [0.17, 0.16, 0.16]}
+          - {id: torso, shape: ellipsoid, center_xyz: [0.0, -18.0, 0.30], radii_xyz: [0.55, 0.28, 0.23]}
+          - {id: left_leg, shape: cylinder, center_xyz: [0.82, -17.87, 0.20], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.09, length_m: 0.90}
+          - {id: right_leg, shape: cylinder, center_xyz: [0.82, -18.13, 0.20], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.09, length_m: 0.90}
+
+  - id: dog_standing
+    label: Medium dog standing
+    objects:
+      - id: dog
+        category: ANIMAL_DOG
+        pose: STANDING
+        parts:
+          - {id: body, shape: ellipsoid, center_xyz: [0.0, -10.0, 0.55], radii_xyz: [0.23, 0.50, 0.25]}
+          - {id: head, shape: ellipsoid, center_xyz: [0.0, -9.48, 0.72], radii_xyz: [0.22, 0.20, 0.22]}
+          - {id: front_left_leg, shape: cylinder, center_xyz: [-0.14, -9.70, 0.25], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.055, length_m: 0.45}
+          - {id: front_right_leg, shape: cylinder, center_xyz: [0.14, -9.70, 0.25], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.055, length_m: 0.45}
+          - {id: rear_left_leg, shape: cylinder, center_xyz: [-0.14, -10.30, 0.25], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.055, length_m: 0.45}
+          - {id: rear_right_leg, shape: cylinder, center_xyz: [0.14, -10.30, 0.25], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.055, length_m: 0.45}
+          - {id: tail, shape: cylinder, center_xyz: [0.0, -10.58, 0.66], axis_xyz: [0.0, -0.94, 0.34], radius_m: 0.045, length_m: 0.45}
+
+  - id: dog_lying
+    label: Medium dog lying on the track
+    objects:
+      - id: dog
+        category: ANIMAL_DOG
+        pose: LYING
+        parts:
+          - {id: body, shape: ellipsoid, center_xyz: [0.0, -16.0, 0.23], radii_xyz: [0.30, 0.55, 0.18]}
+          - {id: head, shape: ellipsoid, center_xyz: [0.0, -15.48, 0.27], radii_xyz: [0.22, 0.21, 0.19]}
+          - {id: forelegs, shape: cylinder, center_xyz: [0.0, -15.18, 0.12], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.055, length_m: 0.55}
+
+  - id: suitcase
+    label: Suitcase with handle
+    objects:
+      - id: suitcase
+        category: LUGGAGE
+        pose: UPRIGHT
+        parts:
+          - {id: body, shape: box, center_xyz: [0.35, -20.0, 0.42], size_xyz: [0.65, 0.32, 0.78], yaw_deg: 8.0}
+          - {id: handle, shape: cylinder, center_xyz: [0.35, -20.0, 0.91], axis_xyz: [0.0, 0.0, 1.0], radius_m: 0.035, length_m: 0.24}
+
+  - id: low_box
+    label: Low cardboard-box proxy
+    objects:
+      - id: box
+        category: BOX
+        pose: ON_TRACK
+        shape: box
+        center_xyz: [0.55, -8.0, 0.15]
+        size_xyz: [0.70, 0.55, 0.30]
+        yaw_deg: 20.0
+
+  - id: crowbar
+    label: Crowbar lying across the track
+    objects:
+      - id: crowbar
+        category: TOOL_CROWBAR
+        pose: ACROSS_TRACK
+        shape: cylinder
+        center_xyz: [0.0, -14.0, 0.08]
+        axis_xyz: [1.0, 0.0, 0.0]
+        radius_m: 0.025
+        length_m: 1.50
+
+  - id: shovel
+    label: Shovel lying on the track
+    objects:
+      - id: shovel
+        category: TOOL_SHOVEL
+        pose: DIAGONAL_ON_TRACK
+        parts:
+          - {id: handle, shape: cylinder, center_xyz: [0.0, -22.0, 0.12], axis_xyz: [0.45, -0.89, 0.0], radius_m: 0.025, length_m: 1.35}
+          - {id: blade, shape: box, center_xyz: [0.31, -22.62, 0.11], size_xyz: [0.34, 0.28, 0.08], yaw_deg: -27.0}
+
+  - id: jacket_bundle
+    label: Jacket or soft bundle on the track
+    objects:
+      - id: jacket
+        category: CLOTHING_BUNDLE
+        pose: CRUMPLED
+        parts:
+          - {id: main_fold, shape: ellipsoid, center_xyz: [-0.15, -11.0, 0.14], radii_xyz: [0.42, 0.34, 0.14], yaw_deg: 18.0}
+          - {id: left_fold, shape: ellipsoid, center_xyz: [-0.46, -11.10, 0.09], radii_xyz: [0.28, 0.15, 0.08], yaw_deg: -22.0}
+          - {id: right_fold, shape: ellipsoid, center_xyz: [0.20, -10.88, 0.10], radii_xyz: [0.30, 0.16, 0.09], yaw_deg: 35.0}
+
+  - id: pipe_across_track
+    label: Pipe across both rails
+    objects:
+      - id: pipe
+        category: PIPE
+        pose: ACROSS_TRACK
+        shape: cylinder
+        center_xyz: [0.0, -25.0, 0.10]
+        axis_xyz: [1.0, 0.0, 0.0]
+        radius_m: 0.06
+        length_m: 2.40
+
+  - id: cable
+    label: Loose cable or hose crossing the track
+    objects:
+      - id: cable
+        category: CABLE_OR_HOSE
+        pose: CURVED_ACROSS_TRACK
+        parts:
+          - {id: segment_1, shape: cylinder, center_xyz: [-0.78, -13.10, 0.045], axis_xyz: [0.92, 0.39, 0.0], radius_m: 0.025, length_m: 0.72}
+          - {id: segment_2, shape: cylinder, center_xyz: [-0.20, -12.88, 0.045], axis_xyz: [0.98, 0.18, 0.0], radius_m: 0.025, length_m: 0.55}
+          - {id: segment_3, shape: cylinder, center_xyz: [0.28, -12.96, 0.045], axis_xyz: [0.90, -0.44, 0.0], radius_m: 0.025, length_m: 0.52}
+          - {id: segment_4, shape: cylinder, center_xyz: [0.70, -13.28, 0.045], axis_xyz: [0.74, -0.67, 0.0], radius_m: 0.025, length_m: 0.56}
+
+  - id: maintenance_trolley
+    label: Maintenance trolley with load and handle
+    objects:
+      - id: trolley
+        category: MAINTENANCE_TROLLEY
+        pose: ON_TRACK
+        parts:
+          - {id: deck, shape: box, center_xyz: [0.0, -30.0, 0.34], size_xyz: [1.00, 0.72, 0.18]}
+          - {id: load, shape: box, center_xyz: [0.0, -30.0, 0.70], size_xyz: [0.70, 0.50, 0.55]}
+          - {id: handle_left, shape: cylinder, center_xyz: [-0.40, -30.34, 0.90], axis_xyz: [0.0, -0.28, 0.96], radius_m: 0.025, length_m: 1.10}
+          - {id: handle_right, shape: cylinder, center_xyz: [0.40, -30.34, 0.90], axis_xyz: [0.0, -0.28, 0.96], radius_m: 0.025, length_m: 1.10}
+          - {id: wheel_front_left, shape: cylinder, center_xyz: [-0.52, -29.75, 0.14], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.12, length_m: 0.10}
+          - {id: wheel_front_right, shape: cylinder, center_xyz: [0.52, -29.75, 0.14], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.12, length_m: 0.10}
+          - {id: wheel_rear_left, shape: cylinder, center_xyz: [-0.52, -30.25, 0.14], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.12, length_m: 0.10}
+          - {id: wheel_rear_right, shape: cylinder, center_xyz: [0.52, -30.25, 0.14], axis_xyz: [1.0, 0.0, 0.0], radius_m: 0.12, length_m: 0.10}

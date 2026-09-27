@@ -1,0 +1,20 @@
+{
+  "scope": "Docker Desktop startup recovery, not source-code repair",
+  "date": "2026-09-18",
+  "version": "4.78.0.229452",
+  "before": {
+    "docker_version_exit": 1,
+    "server_available": false,
+    "observed_error": "initializing Inference manager: dockerInference: ERROR_CANT_ACCESS_FILE",
+    "evidence": ["user screenshot", "local backend log", "fsutil error 1920"]
+  },
+  "after": {
+    "docker_version_exit": 0,
+    "engine": "29.5.3",
+    "platform": "linux/amd64",
+    "docker_build_exit": 0
+  },
+  "classification": "RECOVERY_VERIFIED",
+  "root_cause": "INCONCLUSIVE: inaccessible socket reparse points; reason unknown",
+  "limitations": ["No Windows reboot test", "No Docker source change", "No long-term stability claim"]
+}

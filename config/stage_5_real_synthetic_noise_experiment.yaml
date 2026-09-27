@@ -1,0 +1,97 @@
+schema_version: 1
+experiment_id: stage5_real_fp_synthetic_v1_20260924
+status: DEVELOPMENT_PROTOCOL_ONLY
+baseline: model_v1 + temporal
+temporal_policy: frozen_current_runtime_policy_do_not_retrain
+metric_rule: negative_UNKNOWN_counts_as_FP_without_changing_runtime_UNKNOWN_not_CLEAR
+
+real_train:
+  source_id: new_data
+  bag_offset_seconds: [0, 600)
+  expected_frames: 6000
+  baseline_model_v1_temporal_fp_frames: 232
+  unknown_accounting: count_as_fp
+  training_component_rule: use_only_existing_CORE_components_from_baseline_fp_frames
+  no_component_policy: record_untrainable_fp_frame_do_not_synthesize_component
+
+real_test:
+  new_data_bag_offset_seconds: [600, end)
+  other_real_sources:
+    - roundT_doubleT
+    - squareT_platform_squareT_switch
+    - doubleT_platform
+    - roundT_squareT_pressureGate_squareT
+    - roundT_pressureGate_roundT
+  positive_regression:
+    source_id: doubleT_obstacle
+    expected_detected_frames: 52
+    note: known positive regression only, not independent real-world recall
+  forbidden_for_training:
+    - hard_negative_mining
+    - threshold_selection
+    - hyperparameter_selection
+
+synthetic_train:
+  dataset_version: synthetic_obstacles_stage5_train_v1_20260924
+  source_windows:
+    - source_id: roundT_doubleT
+      first_frame: 0
+      count: 8
+  split_policy: all_train
+  scenarios:
+    - standing_person
+    - lying_person
+    - dog_standing
+    - dog_lying
+    - suitcase
+    - low_box
+    - crowbar
+    - shovel
+    - jacket_bundle
+    - pipe_across_track
+    - cable
+    - maintenance_trolley
+  distances_m: [10, 30, 60, 100]
+  zones: [center, left_boundary, right_boundary]
+  expected_placements: 1152
+  minimum_structure: 3 CORE-relative zones x 8 source-frame/background groups per class-distance
+  visibility_rule: zero synthetic returns is visibility_failure_not_FN_not_positive_train
+
+synthetic_held_out:
+  dataset_version: synthetic_obstacles_stage5_held_out_v1_20260924
+  source_windows:
+    - source_id: roundT_pressureGate_roundT
+      first_frame: 0
+      count: 8
+  split_policy: all_synthetic_held_out
+  distances_m: [10, 30, 60, 100]
+  zones: [center, left_boundary, right_boundary]
+  selection_rule: never use for model selection or threshold tuning
+
+feasibility_gate:
+  dataset_version: synthetic_obstacles_stage5_feasibility_100m_v1_20260924
+  source_windows:
+    - source_id: roundT_doubleT
+      first_frame: 0
+      count: 8
+  distance_m: 100
+  zones: [center, left_boundary, right_boundary]
+  expected_placements: 288
+  stop_if_valid_train_examples_less_than_expected: true
+  required_checks:
+    - valid axis/geometry at 100 m
+    - synthetic returns present
+    - returns intersect classifier CORE component area
+    - visibility failures reported by scenario and reason
+
+candidates:
+  - model_v1 + temporal
+  - random_forest + temporal
+  - gradient_boosting + temporal
+  - lightgbm + temporal
+
+validation:
+  development_selection: grouped temporal cross-validation inside first 10 minutes of new_data only
+  final_training: all allowed train data after selection
+  compare_against: model_v1 + same temporal
+  reject_policy: save rejected candidate and do not integrate into C++/ROS2 runtime

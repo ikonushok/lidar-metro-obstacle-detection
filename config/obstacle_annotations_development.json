@@ -1,0 +1,40 @@
+{
+  "dataset": "doubleT_obstacle",
+  "first_header_timestamp_ns": "946687297199933052",
+  "purpose": "DEVELOPMENT_USER_CONFIRMED_OBSTACLES_NOT_INDEPENDENT_GROUND_TRUTH",
+  "semantic_policy": "ANY_PHYSICAL_OBJECT_OR_GEOMETRY_INSIDE_TRAIN_ENVELOPE_IS_AN_OBSTACLE",
+  "point_annotations": [
+    {
+      "event_id": "OBS-002",
+      "label": "Контрольная помеха",
+      "annotation_source": "USER_SELECTED_SOURCE_POINT",
+      "frame_index": 55,
+      "header_timestamp_ns": "946687302700111985",
+      "source_frame": "lidar_livox",
+      "anchor_source_coordinates": {
+        "x": -1.3050981760025024,
+        "y": -56.34038162231445,
+        "z": -1.1873599290847778
+      },
+      "approximate_anchor_distance_m": 56.36800250317754,
+      "independent_ground_truth": false
+    },
+    {
+      "event_id": "OBS-003",
+      "label": "Контрольная помеха",
+      "annotation_source": "USER_SELECTED_SOURCE_POINT",
+      "frame_index": 160,
+      "header_timestamp_ns": "946687313300083041",
+      "source_frame": "lidar_livox",
+      "anchor_source_coordinates": {
+        "x": 1.791092872619629,
+        "y": -3.4157321453094482,
+        "z": -0.5219449400901794
+      },
+      "approximate_anchor_distance_m": 3.892000293850819,
+      "independent_ground_truth": false
+    }
+  ],
+  "detector_input_permitted": false,
+  "safety_decision_permitted": false
+}
