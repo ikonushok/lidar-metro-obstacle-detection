@@ -148,7 +148,7 @@ ros2 bag play → PointCloud2 → C++ ROS2-узел
 
 Оба входа используют общее C++-ядро. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=baseline_v3`.
 
-Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. Сдачный маршрут: direct player для просмотра подготовленных источников и отдельный headless ROS2 path для `ros2 bag play`.
+Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. Маршрут: direct player для просмотра подготовленных источников и отдельный headless ROS2 path для `ros2 bag play`.
 
 Для быстрого headless demo можно использовать единый wrapper:
 
@@ -295,7 +295,7 @@ docs/
   DATASETS_AND_ASSUMPTIONS.md
   TRAIN_ENVELOPE_AND_LIMITATIONS.md
   LIDAR_SPEC.md
-  reports/submission/    сдачные отчёты проверки
+  reports/submission/    отчёты и проверки
   hackathon_documentations/instruction.md
 ```
 
