@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="lidar_MosMetro3D — обнаружение препятствий по 3D-лидару в тоннеле метро">
+  <img src="./assets/readme/hero.svg" width="100%" alt="lidar-metro-obstacle-detection — обнаружение препятствий по 3D-лидару в тоннеле метро">
 </p>
 
-# lidar_MosMetro3D
+# lidar-metro-obstacle-detection
 
 Экспериментальный модуль обнаружения препятствий в габарите движения поезда метро по облакам 3D-лидара. Текущее решение ищет рельсы, строит габарит с продолжением `tangent` и применяет обученную `candidate_baseline_v2` к компонентам внутри него: «препятствие / шум».
 
