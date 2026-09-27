@@ -110,16 +110,38 @@
     `noise_filter_mode=candidate_baseline_v2`,
     `system_status=UNKNOWN`,
     `safety_decision_permitted=false`.
+  - `scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle` —
+    PASS; в сдачной копии создан ignored
+    `dataset/extracted/doubleT_obstacle` с `metadata.yaml` и
+    `doubleT_obstacle_0.db3`.
+  - Headless ROS2 smoke:
+    `docker run ... ros2 run lidar_mosmetro3d_cpp curve_envelope_node ...`,
+    затем `ros2 topic echo` и `ros2 bag play /data --rate 1.0 --read-ahead-queue-size 2`
+    — PASS_WITH_RISKS. Bag info: 4.5 GiB, 20.392030296 s, 201
+    `sensor_msgs/msg/PointCloud2` messages on
+    `/sensing/lidar/hesai128/pointcloud`. `ros2 bag play` выдавал
+    `Message queue starved` warnings на Windows/Docker bind mount и был
+    остановлен вручную после smoke-части, поэтому throughput/full replay не
+    заявляется.
+  - ROS2 echo summary from `/tmp/candidate_echo.txt`: 45 JSON records parsed;
+    `runtime_transport=ros2`,
+    `noise_filter_mode=candidate_baseline_v2`,
+    `system_status=UNKNOWN`,
+    `safety_decision_permitted=false`,
+    `alarm_seen=true`,
+    `alarm_distance_m=55.580002`.
 - Validation level achieved: L1 для unit-тестов gate, чистого repo-gate и
   Docker build; L3 для direct-player smoke на локальных hardlink-датасетах;
-  L0/L1 для полного соответствия ТЗ до ROS2 replay на данных.
-- Что не проверено: полный ROS2 replay, p95/p99, drops/resources, открытие
-  публичной ссылки из инкогнито, финальные видео и презентация.
+  L3/PASS_WITH_RISKS для headless ROS2 smoke на части `doubleT_obstacle`;
+  L0/L1 для full real-time/throughput claims.
+- Что не проверено: полный непрерывный ROS2 replay без `Message queue starved`,
+  p95/p99, drops/resources, открытие публичной ссылки из инкогнито, финальные
+  видео и презентация.
 - Известные FP/FN или safety-риски: качество детекции не менялось; прежние
   ограничения `UNKNOWN != CLEAR`, assumed geometry и отсутствие production
   safety сохраняются.
-- Следующий минимальный тест: выполнить ROS2/headless replay на подготовленном
-  `dataset/extracted/doubleT_obstacle`, затем записать короткое demo video /
-  screenshots.
+- Следующий минимальный тест: прогнать полный ROS2 replay на более подходящем
+  диске/стенде или с подобранной очередью без преждевременной остановки, затем
+  записать короткое demo video / screenshots.
 - Residual risk: gate защищает состав репозитория, но не доказывает runtime
   quality, real-time или соответствие скрытой проверке жюри.
