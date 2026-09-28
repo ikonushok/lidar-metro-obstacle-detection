@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Архитектура lidar-metro-obstacle-detection",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 700]
+  },
+  "components": [
+    {
+      "id": "archives",
+      "type": "database",
+      "label": "Архивы организаторов",
+      "sublabel": "TAR с записями ROS2",
+      "pos": [45, 130],
+      "size": [185, 70]
+    },
+    {
+      "id": "direct_reader",
+      "type": "backend",
+      "label": "Прямой reader",
+      "sublabel": "запись → XYZ",
+      "pos": [300, 130],
+      "size": [175, 70]
+    },
+    {
+      "id": "customer_recording",
+      "type": "external",
+      "label": "Запись проверяющего",
+      "sublabel": "PointCloud2",
+      "pos": [45, 390],
+      "size": [185, 70]
+    },
+    {
+      "id": "ros_node",
+      "type": "backend",
+      "label": "ROS2-узел",
+      "sublabel": "curve_envelope_node",
+      "pos": [300, 390],
+      "size": [175, 70]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "Общее C++ ядро",
+      "sublabel": "рельсы · габарит · baseline_v3",
+      "pos": [605, 260],
+      "size": [215, 82]
+    },
+    {
+      "id": "http_player",
+      "type": "backend",
+      "label": "HTTP-плеер",
+      "sublabel": "JSON и облако точек",
+      "pos": [905, 130],
+      "size": [175, 70]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Браузер",
+      "sublabel": "просмотр сцены",
+      "pos": [1165, 130],
+      "size": [175, 70]
+    },
+    {
+      "id": "ros_topic",
+      "type": "messagebus",
+      "label": "Выходной топик",
+      "sublabel": "std_msgs/String · JSON",
+      "pos": [905, 390],
+      "size": [175, 70]
+    },
+    {
+      "id": "topic_echo",
+      "type": "external",
+      "label": "Проверка результата",
+      "sublabel": "ros2 topic echo",
+      "pos": [1165, 390],
+      "size": [175, 70]
+    }
+  ],
+  "connections": [
+    {
+      "id": "archives_to_reader",
+      "from": "archives",
+      "to": "direct_reader",
+      "label": "TAR"
+    },
+    {
+      "id": "reader_to_core",
+      "from": "direct_reader",
+      "to": "core",
+      "label": "XYZ через stdin",
+      "variant": "emphasis"
+    },
+    {
+      "id": "recording_to_ros",
+      "from": "customer_recording",
+      "to": "ros_node",
+      "label": "ros2 bag play"
+    },
+    {
+      "id": "ros_to_core",
+      "from": "ros_node",
+      "to": "core",
+      "label": "вызов C++",
+      "variant": "emphasis"
+    },
+    {
+      "id": "core_to_http",
+      "from": "core",
+      "to": "http_player",
+      "label": "JSON через stdout"
+    },
+    {
+      "id": "http_to_browser",
+      "from": "http_player",
+      "to": "browser",
+      "label": "HTTP :8100"
+    },
+    {
+      "id": "core_to_topic",
+      "from": "core",
+      "to": "ros_topic",
+      "label": "JSON в ROS2"
+    },
+    {
+      "id": "topic_to_echo",
+      "from": "ros_topic",
+      "to": "topic_echo",
+      "label": "подписка"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Общая обработка",
+      "items": [
+        "Проверка входа → ось рельсов → габарит tangent",
+        "Сильное пересечение → obstacle; слабый случай → temporal model-assist"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Граница решения",
+      "items": [
+        "UNKNOWN и отсутствие кандидата не означают свободный путь",
+        "Разрешение движения не выдаётся: safety_decision_permitted=false"
+      ]
+    }
+  ]
+}

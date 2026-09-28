@@ -4,9 +4,13 @@
 
 # lidar-metro-obstacle-detection
 
-Экспериментальный модуль обнаружения препятствий в габарите движения поезда метро по облакам 3D-лидара. Текущий алгоритм — `baseline_v3`: C++ ядро с браузерным плеером для записей и отдельным ROS2-входом для `PointCloud2`.
+Демонстрационный прототип обнаружения препятствий в тоннеле метро по облакам 3D-лидара.
 
-[**Открыть схему архитектуры →**](assets/diagrams/solution_architecture.svg) Схема показывает путь от облака точек до результата; [два способа запуска](assets/diagrams/readme_launch_paths.svg) используют одно ядро.
+[![Architecture: interactive diagram](https://img.shields.io/badge/architecture-interactive%20diagram-0891b2)](https://ikonushok.github.io/lidar-metro-obstacle-detection/diagrams/runtime-architecture.html)
+
+[**Открыть интерактивную схему архитектуры →**](https://ikonushok.github.io/lidar-metro-obstacle-detection/diagrams/runtime-architecture.html) Масштабирование, темы и просмотр связей между компонентами. Схема показывает оба способа запуска и общую C++ реализацию.
+
+Текущий алгоритм — `baseline_v3`: C++ ядро с браузерным плеером для записей и отдельным ROS2-входом для `PointCloud2`.
 
 Конвейер обработки:
 
