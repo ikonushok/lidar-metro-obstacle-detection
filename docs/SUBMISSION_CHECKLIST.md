@@ -1,9 +1,9 @@
-# Чеклист сдачи решения
+# Чеклист передачи решения
 
 Этот документ фиксирует порядок подготовки публичного репозитория и материалов
 перед отправкой ссылки в личный кабинет. Данные `dataset/` в Git не добавляются.
 
-Перед финальной сдачей явно фиксируется, что сдаётся `baseline_v3 runtime
+Перед финальной передачей явно фиксируется, что передаётся `baseline_v3 runtime
 pipeline`: geometry-first gate, boundary warning и temporal model-assist только
 для слабых/неочевидных случаев. Финальная модель описана как единая
 `baseline_v3` runtime policy.
@@ -90,9 +90,20 @@ ros2 bag play -> curve_envelope_node -> /stage_3/curve_envelope_candidate
 - `UNKNOWN` и отсутствие кандидата не описываются как `CLEAR`;
 - `safety_decision_permitted=false`.
 
-## 5. Документация и презентация
+## 5. Метрики
 
-Перед сдачей должны быть готовы ссылки или файлы:
+Основная таблица TP/TN/FP/FN пересчитывается воспроизводимой командой из
+[EVALUATION_METRICS.md](EVALUATION_METRICS.md). Правила разметки лежат в
+[`config/evaluation_labels.json`](../config/evaluation_labels.json).
+
+В основную таблицу входят real replay sources и `cloud_with_fake_obj` с
+пометкой `working event-window labels, not full GT`. `synthetic_no100` не
+смешивается с основной таблицей, потому что это component-level development
+probe, а не внешний replay-bag.
+
+## 6. Документация и презентация
+
+Перед отправкой должны быть готовы ссылки или файлы:
 
 - GitHub repository;
 - документация: `SOLUTION.md` или PDF/облачный документ на его основе;
@@ -104,7 +115,7 @@ ros2 bag play -> curve_envelope_node -> /stage_3/curve_envelope_candidate
 - smoke report headless ROS2:
   `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md`.
 
-## 6. Stop-code
+## 7. Stop-code
 
 До дедлайна 29 сентября 23:59 МСК:
 

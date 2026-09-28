@@ -1,0 +1,84 @@
+{
+  "format": "lidar_metro_obstacle_evaluation_labels_v1",
+  "policy": {
+    "primary_table": "replay_sources_only",
+    "decision_field": "intrusion_candidate_present",
+    "unknown_policy": "reported separately by runtime; not treated as CLEAR",
+    "synthetic_no100": "development component probe; excluded from the primary table"
+  },
+  "sources": [
+    {
+      "source_id": "roundT_doubleT",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/for_hackathon",
+      "bag_prefix": "for_hackathon/roundT_doubleT",
+      "default_label": "negative"
+    },
+    {
+      "source_id": "squareT_platform_squareT_switch",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/for_hackathon",
+      "bag_prefix": "for_hackathon/squareT_platform_squareT_switch",
+      "default_label": "negative"
+    },
+    {
+      "source_id": "doubleT_platform",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/for_hackathon",
+      "bag_prefix": "for_hackathon/doubleT_platform",
+      "default_label": "negative"
+    },
+    {
+      "source_id": "roundT_squareT_pressureGate_squareT",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/for_hackathon",
+      "bag_prefix": "for_hackathon/roundT_squareT_pressureGate_squareT",
+      "default_label": "negative"
+    },
+    {
+      "source_id": "doubleT_obstacle",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/for_hackathon",
+      "bag_prefix": "for_hackathon/doubleT_obstacle",
+      "default_label": "negative",
+      "positive_frames_inclusive": [[13, 64]]
+    },
+    {
+      "source_id": "roundT_pressureGate_roundT",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/for_hackathon",
+      "bag_prefix": "for_hackathon/roundT_pressureGate_roundT",
+      "default_label": "negative"
+    },
+    {
+      "source_id": "new_data",
+      "kind": "frame",
+      "archive": "dataset/for_hackathon/new_data",
+      "bag_prefix": "new_data",
+      "default_label": "negative"
+    },
+    {
+      "source_id": "cloud_with_fake_obj",
+      "kind": "event_window",
+      "archive": "dataset/for_hackathon/cloud_with_fake_obj",
+      "bag_prefix": "cloud_with_fake_obj",
+      "label_status": "working event-window labels, not full GT",
+      "positive_events": [
+        {"event_id": "obj01_2x2_center", "frames_inclusive": [204, 216]},
+        {"event_id": "obj02_small_center", "frames_inclusive": [365, 368]},
+        {"event_id": "obj03_small_on_rails", "frames_inclusive": [478, 480]},
+        {"event_id": "obj04_small_edge_inside", "frames_inclusive": [530, 532]},
+        {"event_id": "obj06_2x2_edge_inside", "frames_inclusive": [579, 581]},
+        {"event_id": "obj09_long_low_on_rails", "frames_inclusive": [1138, 1156]}
+      ],
+      "negative_events": [
+        {"event_id": "obj07_2x2_outside", "frames_inclusive": [630, 633]}
+      ],
+      "excluded_from_scoring": [
+        "obj05_small_outside_close",
+        "obj08_2x2_above",
+        "obj10_ceiling_thin"
+      ]
+    }
+  ]
+}

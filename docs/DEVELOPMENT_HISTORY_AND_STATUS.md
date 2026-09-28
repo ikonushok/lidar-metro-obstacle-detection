@@ -1,6 +1,6 @@
 # История работ и текущий статус
 
-Статус: публичная сводка для сдачного среза, 2026-09-27.
+Статус: публичная сводка для среза на сдачу, 2026-09-27.
 
 Этот документ показывает, какую работу мы прошли до текущего решения, но не
 заменяет проверку кода. Для запуска используйте [README](../README.md) и
@@ -18,7 +18,7 @@ PointCloud2 / XYZ
   -> JSON diagnostics
 ```
 
-Слабая score-ветка перенесена внутрь `baseline_v3`; финальным сдачным решением
+Слабая score-ветка перенесена внутрь `baseline_v3`; финальным решением для сдачи
 является весь `baseline_v3 runtime pipeline`.
 `UNKNOWN` и неподтверждённый слабый случай не превращаются в `CLEAR`.
 
@@ -29,19 +29,19 @@ PointCloud2 / XYZ
 | Docker/ROS2 среда | Реализована сборка на `ros:humble-ros-base-jammy` | Проверяет воспроизводимость контейнера, но не production real-time |
 | PointCloud2 input | Реализовано чтение фактической схемы сообщений | Новые bag требуют проверки topic/frame и схемы |
 | Direct player | Реализован HTTP-плеер через постоянный C++ процесс | Средство просмотра и демонстрации, не обязательный интерфейс автопроверки |
-| Headless ROS2 path | Реализован `curve_envelope_node` для `ros2 bag play` | Основной сдачный путь без браузера |
+| Headless ROS2 path | Реализован `curve_envelope_node` для `ros2 bag play` | Основной путь для сдачи без браузера |
 | Рельсы и габарит | Реализована локальная цепочка наблюдаемых пар + tangent extension | Геометрия имеет статус engineering assumption без внешней калибровки |
 | `baseline_v3` | Интегрирован в direct player и ROS2 node | Development-качество не равно независимой сертификации |
 | Synthetic/fake-object dataset | Поддержан в подготовке данных и плеере | Демонстрационная проверка, не замена скрытого теста жюри |
 | Repo gate | `scripts/check_submission_package.py` проверяет публичный состав | Gate не доказывает качество детекции |
 
-## Подтверждённые проверки сдачного среза
+## Подтверждённые проверки среза для сдачи
 
 | Проверка | Результат / смысл |
 |---|---|
 | Docker build | Образ `lidar-metro-obstacle-detection:submission` собирается |
-| Public scripts surface | В Docker context входят только сдачные scripts, `scripts/research/` исключён |
-| Public src surface | В сдачной поверхности оставлены C++ ядро, ROS2 node и reader/player helpers |
+| Public scripts surface | В Docker context входят только публичные scripts, `scripts/research/` исключён |
+| Public src surface | В проверочном пакете оставлены C++ ядро, ROS2 node и reader/player helpers |
 | Direct player | Локальный запуск читает подготовленные источники и возвращает JSON |
 | ROS2 wrapper smoke | Headless wrapper запускает detector container и получает JSON через ROS2 topic |
 | Package gate | Проверяет README, SOLUTION, docs, scripts, src, `.gitignore` и отсутствие данных в Git |
@@ -63,7 +63,7 @@ PointCloud2 / XYZ
   поезда.
 - Full real-time throughput, drops, p95/p99 latency и ресурсы на стенде
   организатора требуют отдельного замера.
-- CUDA, deskew, tracking, TTC и управление поездом не входят в сдачный MVP.
+- CUDA, deskew, tracking, TTC и управление поездом не входят в MVP для сдачи.
 
 ## Что должен уметь сделать проверяющий
 
@@ -73,7 +73,7 @@ PointCloud2 / XYZ
 4. Запустить headless ROS2 demo через `scripts/run_submission_ros2_demo.ps1`.
 5. Подставить свой распакованный ROS2 bag, topic и `source_frame`.
 6. Запустить `scripts/check_submission_package.py`, чтобы проверить состав
-   сдачного репозитория.
+   репозитория для сдачи.
 
 Эти действия описаны в [README](../README.md), [SOLUTION](../SOLUTION.md),
 [REVIEWER_QUICKSTART](REVIEWER_QUICKSTART.md) и [SUBMISSION_CHECKLIST](SUBMISSION_CHECKLIST.md).

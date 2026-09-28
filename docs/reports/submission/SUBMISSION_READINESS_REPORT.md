@@ -19,7 +19,7 @@
 
 ## Текущий подтверждённый срез
 
-Сдачный runtime — `baseline_v3`, а не отдельная ML-модель. Он использует
+Runtime для сдачи — `baseline_v3`, а не отдельная ML-модель. Он использует
 geometry-first gate, boundary/warning и temporal model-assist; слабый score
 встроен внутрь `baseline_v3`.
 

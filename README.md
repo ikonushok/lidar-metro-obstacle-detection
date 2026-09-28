@@ -34,7 +34,7 @@ PointCloud2 / XYZ
   → если temporal model-assist не подтвердил → UNKNOWN
 ```
 
-Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Финальная сдачная модель описана как единый `baseline_v3` runtime policy в [models/baseline_v3_runtime_policy.json](models/baseline_v3_runtime_policy.json); метод и границы описаны в [методологии](docs/METHODOLOGY.md), численные ограничения — в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
+Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Финальная передаваемая модель описана как единый `baseline_v3` runtime policy в [models/baseline_v3_runtime_policy.json](models/baseline_v3_runtime_policy.json); метод и границы описаны в [методологии](docs/METHODOLOGY.md), численные ограничения — в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
 
 ## Где должны лежать данные
 
@@ -128,7 +128,7 @@ $frame.result | Select-Object intrusion_candidate_present, reportable_core_count
 
 В manifest и JSON плеера должны быть `runtime_transport=direct_cpp`, `noise_filter_mode=baseline_v3`. Валидатор отдельно запускает ROS2 в тестовом контейнере и сверяет direct/ROS2 на одинаковом входе; самому плееру ROS2-транспорт не нужен. Для проверки нужны сохранённые XYZF и extracted bag `doubleT_obstacle`; это проверка интеграции, не независимого качества модели.
 
-Исторический явный `-RailSelectionMethod baseline` остаётся совместимым режимом launcher'а, но сдачный маршрут — `development_candidate` + direct C++ player и отдельный headless ROS2 wrapper. Отдельной опции измерения окна в launcher'е больше нет.
+Исторический явный `-RailSelectionMethod baseline` остаётся совместимым режимом launcher'а, но маршрут для сдачи — `development_candidate` + direct C++ player и отдельный headless ROS2 wrapper. Отдельной опции измерения окна в launcher'е больше нет.
 
 Остановить плеер:
 
@@ -256,7 +256,7 @@ docker stop lidar-detector
 - Dockerfile использует `ros:humble-ros-base-jammy`; системные Python/ROS-зависимости устанавливаются APT, C++ пакет собирается colcon.
 - [`.python-version`](.python-version) содержит `3.10`. Локальная Windows `.venv` — отдельная среда; на этой машине её конфигурация указывает Python 3.12.10. Смена локального Python не требуется для запуска контейнера.
 - [`requirements.txt`](requirements.txt) перечисляет NumPy и Matplotlib; ROS2/rclpy/messages поставляются образом, а исследовательские scripts могут требовать дополнительные системные или локальные зависимости. Этот файл не является полным установщиком ROS-окружения.
-- CPU — основной путь. GPU/CUDA не входит в сдачный маршрут и не требуется для проверки Docker/ROS2 demo.
+- CPU — основной путь. GPU/CUDA не входит в маршрут для сдачи и не требуется для проверки Docker/ROS2 demo.
 
 ## Документация
 
