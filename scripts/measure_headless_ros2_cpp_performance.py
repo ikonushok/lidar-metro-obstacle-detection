@@ -5,11 +5,35 @@ import statistics
 import subprocess
 import threading
 import time
+import uuid
 from pathlib import Path
 
 
 def run(args, **kwargs):
     return subprocess.run(args, text=True, capture_output=True, **kwargs)
+
+
+def start_container_process(container, command, **kwargs):
+    pid_path = f"/tmp/headless_perf_{uuid.uuid4().hex}.pid"
+    process = subprocess.Popen(
+        ["docker", "exec", container, "/ros_entrypoint.sh", "bash", "-c",
+         'echo $$ > "$1"; shift; exec "$@"', "bash", pid_path, *command],
+        text=True, **kwargs,
+    )
+    return process, pid_path
+
+
+def finish_container_process(container, process, pid_path):
+    # Terminating docker exec on the host does not stop its container process.
+    # Signal only the PID owned by this measurement, never another collector.
+    code = (
+        "import os,pathlib,signal,sys; p=pathlib.Path(sys.argv[1]); "
+        "pid=int(p.read_text()) if p.exists() else None; "
+        "p.unlink(missing_ok=True); "
+        "os.kill(pid,signal.SIGTERM) if pid and sys.argv[2]=='stop' else None"
+    )
+    return run(["docker", "exec", container, "python3", "-c", code, pid_path,
+                "stop" if process.poll() is None else "cleanup"], timeout=10)
 
 
 def parse_percent(value):
@@ -47,6 +71,9 @@ def main():
     parser.add_argument("--out-dir", default="artefacts/current_model_validation")
     parser.add_argument("--output-stem", default="")
     args = parser.parse_args()
+    if (args.expected_messages <= 0 or args.collector_timeout_seconds <= 0
+            or args.rate <= 0 or args.read_ahead_queue_size <= 0):
+        parser.error("message count, timeout, rate and queue size must be positive")
 
     root = Path(__file__).resolve().parents[1]
     if not (root / "Dockerfile").exists():
@@ -65,18 +92,18 @@ def main():
     for path in [summary_path, raw_path, stats_path, play_log_path, collector_log_path]:
         path.unlink(missing_ok=True)
 
-    run(["docker", "exec", args.container, "/bin/bash", "-lc", "pkill -f '/tmp/headless_ros2_perf_collector.py' || true"])
     cp = run(["docker", "cp", str(collector_source), f"{args.container}:/tmp/headless_ros2_perf_collector.py"])
     if cp.returncode != 0:
         raise RuntimeError(f"docker cp failed: {cp.stderr}")
 
-    collector = subprocess.Popen(
+    collector_started = time.monotonic()
+    collector, collector_pid = start_container_process(
+        args.container,
         [
-            "docker", "exec", args.container, "/ros_entrypoint.sh", "python3",
+            "python3",
             "/tmp/headless_ros2_perf_collector.py", args.topic,
             str(args.expected_messages), str(args.collector_timeout_seconds),
         ],
-        text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -98,22 +125,52 @@ def main():
     play_command = [
         "docker", "exec", args.container, "/ros_entrypoint.sh", "ros2", "bag", "play",
         "/data", "--rate", str(args.rate), "--read-ahead-queue-size", str(args.read_ahead_queue_size),
+        "--start-paused", "--disable-keyboard-controls",
+        "--wait-for-all-acked", "5000",
     ]
     play_started = time.monotonic()
-    play = run(play_command)
-    play_finished = time.monotonic()
-    stop_stats.set()
-    stats_thread.join(timeout=5)
+    play_error = None
+    service_outputs = []
+    with play_log_path.open("w", encoding="utf-8") as play_log:
+        play, play_pid = start_container_process(
+            args.container, play_command[4:], stdout=play_log, stderr=subprocess.STDOUT,
+        )
+        try:
+            # play_next waits for the initial queue while the player clock is
+            # paused; resuming afterwards avoids an overdue startup burst.
+            for service, service_type in [("play_next", "PlayNext"), ("resume", "Resume")]:
+                remaining = args.collector_timeout_seconds - (time.monotonic() - collector_started)
+                response = run(
+                    ["docker", "exec", args.container, "/ros_entrypoint.sh", "ros2", "service", "call",
+                     f"/rosbag2_player/{service}", f"rosbag2_interfaces/srv/{service_type}", "{}"],
+                    timeout=max(1, remaining),
+                )
+                service_outputs.append(response.stdout + response.stderr)
+                # Humble Resume has an empty response; only PlayNext returns success.
+                if response.returncode != 0 or (service == "play_next" and "success=True" not in response.stdout):
+                    raise RuntimeError(f"{service} failed: {response.stdout} {response.stderr}")
+            remaining = args.collector_timeout_seconds - (time.monotonic() - collector_started)
+            play.wait(timeout=max(1, remaining))
+        except (RuntimeError, subprocess.TimeoutExpired) as exc:
+            play_error = str(exc)
+        finally:
+            finish_container_process(args.container, play, play_pid)
+            play.wait(timeout=10)
+            play_finished = time.monotonic()
+            stop_stats.set()
+            stats_thread.join(timeout=5)
 
-    play_output = (play.stdout or "") + (play.stderr or "")
-    play_log_path.write_text(play_output, encoding="utf-8")
+    play_output = play_log_path.read_text(encoding="utf-8")
     stats_path.write_text("\n".join(stats_lines) + ("\n" if stats_lines else ""), encoding="utf-8")
 
     try:
-        collector_stdout, collector_stderr = collector.communicate(timeout=30)
+        remaining = args.collector_timeout_seconds - (time.monotonic() - collector_started)
+        collector_stdout, collector_stderr = collector.communicate(timeout=max(1, remaining) + 10)
     except subprocess.TimeoutExpired:
-        run(["docker", "exec", args.container, "/bin/bash", "-lc", "pkill -f '/tmp/headless_ros2_perf_collector.py' || true"])
+        finish_container_process(args.container, collector, collector_pid)
         collector_stdout, collector_stderr = collector.communicate(timeout=10)
+    finally:
+        finish_container_process(args.container, collector, collector_pid)
 
     collector_log_path.write_text(collector_stderr or "", encoding="utf-8")
     if not collector_stdout.strip():
@@ -142,6 +199,10 @@ def main():
         {
             "command": " ".join(play_command),
             "play_exit_code": play.returncode,
+            "collector_exit_code": collector.returncode,
+            "play_error": play_error,
+            "startup_service_output": service_outputs,
+            "play_wall_includes_startup_pause": True,
             "play_wall_seconds": play_finished - play_started,
             "play_effective_input_hz_assuming_expected_messages": args.expected_messages / (play_finished - play_started),
             "rate": args.rate,
@@ -163,6 +224,9 @@ def main():
     )
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(summary_path.read_text(encoding="utf-8"))
+    if (play_error or play.returncode != 0 or collector.returncode != 0
+            or summary["received_messages"] != args.expected_messages):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

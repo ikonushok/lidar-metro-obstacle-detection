@@ -1,10 +1,12 @@
 import json
+import signal
 import statistics
 import sys
 import time
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
+from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
 
 
@@ -29,7 +31,17 @@ def main():
     messages = []
     started = time.monotonic()
 
-    rclpy.init()
+    # A signal must stop the spin loop before destroying its ROS context.
+    # rclpy's default SIGTERM handler can invalidate a wait set mid-spin.
+    shutdown_reason = None
+
+    def request_shutdown(signum, _frame):
+        nonlocal shutdown_reason
+        shutdown_reason = signal.Signals(signum).name
+
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    signal.signal(signal.SIGTERM, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
     node = rclpy.create_node("headless_ros2_cpp_perf_collector")
 
     def callback(msg):
@@ -37,14 +49,16 @@ def main():
 
     node.create_subscription(String, topic, callback, 1000)
     deadline = started + timeout_s
-    shutdown_reason = None
     try:
-        while rclpy.ok() and time.monotonic() < deadline and len(messages) < expected:
+        while (rclpy.ok() and shutdown_reason is None
+               and time.monotonic() < deadline and len(messages) < expected):
             rclpy.spin_once(node, timeout_sec=0.1)
     except ExternalShutdownException:
         shutdown_reason = "ExternalShutdownException"
 
     finished = time.monotonic()
+    if shutdown_reason is None and len(messages) < expected:
+        shutdown_reason = "timeout" if finished >= deadline else "context_shutdown"
     try:
         node.destroy_node()
     except Exception:
