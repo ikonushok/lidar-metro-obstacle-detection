@@ -6,6 +6,18 @@
     "unknown_policy": "reported separately by runtime; not treated as CLEAR",
     "synthetic_no100": "development component probe; excluded from the primary table"
   },
+  "review_object_catalog": [
+    {"object_id": "obj01", "description_ru": "2x2 м по центру", "working_role": "positive", "review_status": "user_visible", "visible_frames_inclusive": [135, 228]},
+    {"object_id": "obj02", "description_ru": "0,3x0,3 м по центру", "working_role": "positive", "review_status": "user_visible", "visible_frames_inclusive": [353, 368]},
+    {"object_id": "obj03", "description_ru": "0,3x0,3 м на рельсах", "working_role": "positive", "review_status": "user_visible", "visible_frames_inclusive": [462, 479]},
+    {"object_id": "obj04", "description_ru": "0,3x0,3 м у края габарита", "working_role": "positive", "review_status": "user_visible", "visible_frames_inclusive": [514, 532]},
+    {"object_id": "obj05", "description_ru": "0,3x0,3 м снаружи рядом", "working_role": "boundary_review", "review_status": "unlocalized_excluded"},
+    {"object_id": "obj06", "description_ru": "2x2 м у края внутри", "working_role": "positive", "review_status": "user_visible", "visible_frames_inclusive": [567, 581]},
+    {"object_id": "obj07", "description_ru": "2x2 м снаружи", "working_role": "negative_review", "review_status": "user_visible", "visible_frames_inclusive": [617, 633]},
+    {"object_id": "obj08", "description_ru": "2x2 м над габаритом", "working_role": "boundary_review", "review_status": "unlocalized_excluded"},
+    {"object_id": "obj09", "description_ru": "2x0,2 м на рельсах", "working_role": "positive_review", "review_status": "ambiguous_excluded"},
+    {"object_id": "obj10", "description_ru": "0,05 м свисает с потолка", "working_role": "positive_review", "review_status": "unlocalized_excluded"}
+  ],
   "sources": [
     {
       "source_id": "roundT_doubleT",
@@ -55,7 +67,8 @@
       "kind": "frame",
       "archive": "dataset/for_hackathon/new_data",
       "bag_prefix": "new_data",
-      "default_label": "negative"
+      "default_label": "negative",
+      "label_status": "user_reported_no_obstacles"
     },
     {
       "source_id": "cloud_with_fake_obj",

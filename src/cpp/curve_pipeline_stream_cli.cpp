@@ -56,7 +56,22 @@ void AppendModelFilterProfileJson(
        << ",\"model_profile_connected_components_and_features_ms\":"
        << profile.connected_components_and_features_ms
        << ",\"model_profile_tree_decision_ms\":" << profile.tree_decision_ms
-       << ",\"model_profile_output_finalize_ms\":" << profile.output_finalize_ms;
+       << ",\"model_profile_output_finalize_ms\":" << profile.output_finalize_ms
+       << ",\"model_profile_baseline_v3_components\":[";
+  for (std::size_t index = 0; index < profile.baseline_v3_components.size(); ++index) {
+    const auto& component = profile.baseline_v3_components[index];
+    if (index) json << ',';
+    json << "{\"point_count\":" << component.point_count
+         << ",\"nearest_source_origin_m\":" << component.nearest_source_origin_m
+         << ",\"source_xyz_bounds\":[" << component.min_x << ',' << component.max_x
+         << ',' << component.min_y << ',' << component.max_y
+         << ',' << component.min_z << ',' << component.max_z << ']'
+         << ",\"assist_score\":";
+    if (component.assist_score < 0.0) json << "null";
+    else json << component.assist_score;
+    json << ",\"decision\":\"" << component.decision << "\"}";
+  }
+  json << ']';
 }
 
 void AppendAutoRailsFailureDiagnosticsJson(
@@ -97,7 +112,10 @@ std::string UnknownJson(
         << (lean_benchmark ? "lidar-curve-envelope-lean-benchmark-v1" : "lidar-curve-envelope-v1")
         << "\",\"status\":\"UNKNOWN\",\"system_status\":\"UNKNOWN\","
         << "\"curve_axis_status\":\"MISSING_CURVE_AXIS\",\"reason\":\"" << rails.reason << "\","
-       << "\"safety_decision_permitted\":false,\"intrusion_candidate_present\":null,"
+        << "\"safety_decision_permitted\":false,\"intrusion_candidate_present\":null,"
+        << "\"experimental_early_frame_candidate_present\":null,"
+        << "\"experimental_early_core_count\":0,"
+        << "\"experimental_early_nearest_distance_from_source_origin_m\":null,"
        << "\"reportable_intrusion_candidate_present\":null,\"raw_core_return_present\":null,"
        << "\"all_core_returns_are_intrusion_candidates\":false,\"margin_return_present\":null,"
        << "\"compute_backend_requested\":\"direct_cpu_stream\",\"compute_backend_used\":\"cpu\","
@@ -124,6 +142,7 @@ std::string UnknownJson(
        << "\"core_bounds_source_axis\":null,\"expanded_bounds_source_axis\":null,"
        << "\"core_envelope_wireframe_source_xyz\":[],\"expanded_envelope_wireframe_source_xyz\":[],"
        << "\"core_source_indices\":[],\"reportable_core_source_indices\":[],"
+       << "\"experimental_early_source_indices\":[],"
        << "\"ignored_noise_source_indices\":[],\"margin_source_indices\":[]}";
   return json.str();
 }
@@ -477,10 +496,25 @@ int main(int argc, char** argv) {
              << result.baseline_v3_boundary_warning_count
              << ",\"baseline_v3_model_assist_count\":"
              << result.baseline_v3_model_assist_count
+             << ",\"experimental_early_frame_candidate_present\":"
+             << (result.baseline_v3_early_candidate_count > 0 ? "true" : "false")
+             << ",\"experimental_early_core_count\":"
+             << result.baseline_v3_early_candidate_count
+             << ",\"experimental_early_nearest_distance_from_source_origin_m\":";
+         if (result.baseline_v3_early_candidate_count > 0) {
+           json << result.nearest_baseline_v3_early_candidate.distance_from_source_origin_m;
+         } else {
+           json << "null";
+         }
+         json
              << ",\"baseline_v3_model_temporal_consecutive_alarm_frames\":"
              << baseline_v3_model_consecutive_alarm_frames
              << ",\"baseline_v3_model_temporal_confirmed_intrusion_candidate_present\":"
              << (baseline_v3_model_temporal_intrusion ? "true" : "false");
+        if (profile_model_filter) {
+          json << ',';
+          AppendModelFilterProfileJson(json, model_filter_profile);
+        }
       }
       json
            << ",\"geometry_basis\":\""
@@ -511,7 +545,7 @@ int main(int argc, char** argv) {
         json << ",\"model_reportable_intrusion_candidate_present\":" << (model_intrusion ? "true" : "false")
              << ",\"model_reportable_core_count\":" << model_result.reportable_core_count
              << ",\"model_ignored_noise_count\":" << model_result.ignored_noise_count;
-        if (profile_model_filter) {
+        if (profile_model_filter && !baseline_v3_filter_computed) {
           json << ',';
           AppendModelFilterProfileJson(json, model_filter_profile);
         }
@@ -555,6 +589,13 @@ int main(int argc, char** argv) {
         if (!first_reportable) json << ',';
         json << index;
         first_reportable = false;
+      }
+      json << "],\"experimental_early_source_indices\":[";
+      bool first_early = true;
+      for (const auto index : result.baseline_v3_early_candidate_source_indices) {
+        if (!first_early) json << ',';
+        json << index;
+        first_early = false;
       }
       json << "],\"ignored_noise_source_indices\":[";
       bool first_noise = true;

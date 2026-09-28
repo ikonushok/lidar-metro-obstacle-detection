@@ -193,7 +193,7 @@ class DirectDetailedCpuRuntime:
                  rail_forward_max_m=80.0, rail_station_length_m=2.0, rail_cell_width_m=0.04,
                  forward_extension_method='tangent', arc_extension_horizon_m=0.0,
                  min_arc_radius_m=60.0, max_arc_turn_deg=8.0, arc_fit_window_pairs=5,
-                 noise_filter_mode='baseline_v3'):
+                 noise_filter_mode='baseline_v3', profile_model_filter=False):
         if rail_selection_method != 'development_candidate':
             raise ValueError('direct stream supports development_candidate only')
         if rail_forward_max_m != 80.0 or rail_station_length_m != 2.0 or rail_cell_width_m != 0.04:
@@ -238,6 +238,8 @@ class DirectDetailedCpuRuntime:
             command.append('--use-model-filter')
         elif noise_filter_mode == 'baseline_v3':
             command.append('--use-baseline-v3-filter')
+        if profile_model_filter:
+            command.append('--profile-model-filter')
         self.process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

@@ -246,18 +246,36 @@ bool BaselineV3BoundaryWarning(const ComponentShapeStats& stats) {
          (stats.centroid_z > 1.00 && extent_x > 1.00 && extent_y > 1.00 && extent_z > 0.30);
 }
 
+bool BaselineV3ExperimentalEarlyCandidate(const ComponentShapeStats& stats) {
+  const double width = stats.max_x - stats.min_x;
+  const double depth = stats.max_y - stats.min_y;
+  const double height = stats.max_z - stats.min_z;
+  const double center_x = (stats.min_x + stats.max_x) * 0.5;
+  if (stats.point_count < 80 || stats.nearest_distance_m <= 7.0 ||
+      stats.nearest_distance_m > 80.0 || depth > 0.8 ||
+      std::abs(center_x) > 1.4) return false;
+  const bool panel = width >= 1.1 && width <= 2.6 &&
+                     height >= 1.1 && height <= 2.6;
+  const bool cube = width >= 0.2 && width <= 0.65 &&
+                    height >= 0.2 && height <= 0.65;
+  return panel || cube;
+}
+
 void ResetReportableOutputs(AnalysisResult& result) {
   result.reportable_core_count = 0;
   result.ignored_noise_count = 0;
   result.baseline_v3_geometry_obstacle_count = 0;
   result.baseline_v3_boundary_warning_count = 0;
   result.baseline_v3_model_assist_count = 0;
+  result.baseline_v3_early_candidate_count = 0;
   result.reportable_core_source_indices.clear();
   result.ignored_noise_source_indices.clear();
   result.baseline_v3_geometry_obstacle_source_indices.clear();
   result.baseline_v3_boundary_warning_source_indices.clear();
   result.baseline_v3_model_assist_source_indices.clear();
+  result.baseline_v3_early_candidate_source_indices.clear();
   result.nearest_reportable_core = {};
+  result.nearest_baseline_v3_early_candidate = {};
 }
 
 void FinalizeReportableOutputs(const float* xyz, AnalysisResult& result) {
@@ -270,6 +288,7 @@ void FinalizeReportableOutputs(const float* xyz, AnalysisResult& result) {
   sort_unique(result.baseline_v3_geometry_obstacle_source_indices);
   sort_unique(result.baseline_v3_boundary_warning_source_indices);
   sort_unique(result.baseline_v3_model_assist_source_indices);
+  sort_unique(result.baseline_v3_early_candidate_source_indices);
   result.reportable_core_count = result.reportable_core_source_indices.size();
   result.ignored_noise_count = result.ignored_noise_source_indices.size();
   result.baseline_v3_geometry_obstacle_count =
@@ -278,6 +297,8 @@ void FinalizeReportableOutputs(const float* xyz, AnalysisResult& result) {
       result.baseline_v3_boundary_warning_source_indices.size();
   result.baseline_v3_model_assist_count =
       result.baseline_v3_model_assist_source_indices.size();
+  result.baseline_v3_early_candidate_count =
+      result.baseline_v3_early_candidate_source_indices.size();
   result.nearest_reportable_core = {};
   for (const std::size_t source_index : result.reportable_core_source_indices) {
     const double distance = std::hypot(static_cast<double>(xyz[source_index * 3]),
@@ -285,6 +306,15 @@ void FinalizeReportableOutputs(const float* xyz, AnalysisResult& result) {
     if (distance < result.nearest_reportable_core.distance_from_source_origin_m) {
       result.nearest_reportable_core.source_index = source_index;
       result.nearest_reportable_core.distance_from_source_origin_m = distance;
+    }
+  }
+  result.nearest_baseline_v3_early_candidate = {};
+  for (const std::size_t source_index : result.baseline_v3_early_candidate_source_indices) {
+    const double distance = std::hypot(static_cast<double>(xyz[source_index * 3]),
+                                      xyz[source_index * 3 + 1], xyz[source_index * 3 + 2]);
+    if (distance < result.nearest_baseline_v3_early_candidate.distance_from_source_origin_m) {
+      result.nearest_baseline_v3_early_candidate.source_index = source_index;
+      result.nearest_baseline_v3_early_candidate.distance_from_source_origin_m = distance;
     }
   }
 }
@@ -874,12 +904,19 @@ void ApplyBaselineV3(const float* xyz, std::size_t point_count,
     const auto shape = ComputeComponentShapeStats(xyz, component);
     const bool boundary_warning =
         component.size() >= kBoundaryWarningMinPoints && BaselineV3BoundaryWarning(shape);
+    if (!boundary_warning && BaselineV3ExperimentalEarlyCandidate(shape)) {
+      result.baseline_v3_early_candidate_source_indices.insert(
+          result.baseline_v3_early_candidate_source_indices.end(),
+          component.begin(), component.end());
+    }
     bool model_obstacle = false;
+    double assist_score = -1.0;
     if (!boundary_warning &&
         component.size() < kStrongGeometryMinPoints) {
       const auto tree_decision_started = std::chrono::steady_clock::now();
       const auto features = BaselineV3AssistScoreFeatures(xyz, component);
-      model_obstacle = BaselineV3AssistScoreScore(features) >= kBaselineV3AssistScoreThreshold;
+      assist_score = BaselineV3AssistScoreScore(features);
+      model_obstacle = assist_score >= kBaselineV3AssistScoreThreshold;
       const auto tree_decision_finished = std::chrono::steady_clock::now();
       tree_decision_ms += std::chrono::duration<double, std::milli>(
           tree_decision_finished - tree_decision_started).count();
@@ -890,6 +927,13 @@ void ApplyBaselineV3(const float* xyz, std::size_t point_count,
         ++profile->model_obstacle_component_count;
       else
         ++profile->model_noise_component_count;
+      const char* decision = boundary_warning ? "boundary_warning" :
+          component.size() >= kStrongGeometryMinPoints ? "geometry_obstacle" :
+          model_obstacle ? "model_assist" : "noise";
+      profile->baseline_v3_components.push_back({
+          component.size(), shape.nearest_distance_m,
+          shape.min_x, shape.max_x, shape.min_y, shape.max_y,
+          shape.min_z, shape.max_z, assist_score, decision});
     }
 
     if (boundary_warning) {

@@ -119,8 +119,10 @@ int main() {
   lidar_mosmetro3d::AnalysisResult baseline_v3_input;
   baseline_v3_input.labels.assign(baseline_v3_points.size() / 3, Zone::kCore);
   baseline_v3_input.core_count = baseline_v3_input.labels.size();
+  FrozenNoiseTreeV1Profile baseline_v3_profile;
   ApplyBaselineV3(
-      baseline_v3_points.data(), baseline_v3_points.size() / 3, baseline_v3_input, 0.25);
+      baseline_v3_points.data(), baseline_v3_points.size() / 3, baseline_v3_input, 0.25,
+      &baseline_v3_profile);
   assert(baseline_v3_input.baseline_v3_geometry_obstacle_count == strong_count);
   assert(baseline_v3_input.baseline_v3_boundary_warning_count ==
          baseline_v3_input.core_count - strong_count);
@@ -128,6 +130,48 @@ int main() {
   assert(baseline_v3_input.ignored_noise_count == baseline_v3_input.core_count - strong_count);
   assert(baseline_v3_input.baseline_v3_geometry_obstacle_source_indices.front() == 0);
   assert(baseline_v3_input.baseline_v3_boundary_warning_source_indices.front() == strong_count);
+  assert(baseline_v3_profile.baseline_v3_components.size() == 2);
+  assert(baseline_v3_profile.baseline_v3_components[0].decision == "geometry_obstacle");
+  assert(baseline_v3_profile.baseline_v3_components[1].decision == "boundary_warning");
+  assert(baseline_v3_input.baseline_v3_early_candidate_count == 0);
+
+  auto check_early_shape = [](const std::vector<float>& points, bool expected) {
+    lidar_mosmetro3d::AnalysisResult input;
+    input.labels.assign(points.size() / 3, Zone::kCore);
+    input.core_count = input.labels.size();
+    ApplyBaselineV3(points.data(), points.size() / 3, input, 0.25);
+    assert((input.baseline_v3_early_candidate_count > 0) == expected);
+    assert(input.core_count == points.size() / 3);
+    if (expected) {
+      assert(input.baseline_v3_early_candidate_count == points.size() / 3);
+      assert(std::isfinite(input.nearest_baseline_v3_early_candidate.distance_from_source_origin_m));
+    }
+  };
+  std::vector<float> distant_panel;
+  for (int ix = 0; ix < 10; ++ix)
+    for (int iz = 0; iz < 10; ++iz)
+      distant_panel.insert(distant_panel.end(), {
+          static_cast<float>(-0.9 + ix * 0.2), -60.0F,
+          static_cast<float>(-0.9 + iz * 0.2)});
+  check_early_shape(distant_panel, true);
+
+  std::vector<float> distant_cube;
+  std::vector<float> near_cube;
+  for (int ix = 0; ix < 5; ++ix)
+    for (int iy = 0; iy < 5; ++iy)
+      for (int iz = 0; iz < 5; ++iz) {
+        const float x = static_cast<float>(-0.14 + ix * 0.07);
+        const float z = static_cast<float>(iz * 0.07);
+        distant_cube.insert(distant_cube.end(), {x, static_cast<float>(-15.0 + iy * 0.07), z});
+        near_cube.insert(near_cube.end(), {x, static_cast<float>(-3.5 + iy * 0.07), z});
+      }
+  check_early_shape(distant_cube, true);
+  check_early_shape(near_cube, false);
+
+  std::vector<float> rail_like;
+  for (int iy = 0; iy < 240; ++iy)
+    rail_like.insert(rail_like.end(), {1.35F, static_cast<float>(-15.0 + iy * 0.05), -0.9F});
+  check_early_shape(rail_like, false);
 
   lidar_mosmetro3d::AnalysisResult baseline_v3_model_input;
   baseline_v3_model_input.labels.assign(model_chain.size() / 3, Zone::kCore);

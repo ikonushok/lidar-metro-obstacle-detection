@@ -40,6 +40,10 @@ BASELINE_V3_PARITY_FIELDS = PARITY_FIELDS + (
     'baseline_v3_geometry_obstacle_count',
     'baseline_v3_boundary_warning_count',
     'baseline_v3_model_assist_count',
+    'experimental_early_frame_candidate_present',
+    'experimental_early_core_count',
+    'experimental_early_source_indices',
+    'experimental_early_nearest_distance_from_source_origin_m',
 )
 
 

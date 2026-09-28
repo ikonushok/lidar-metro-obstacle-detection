@@ -62,9 +62,178 @@ function runShowStatus(result, extra = {}) {
   if (extra.nearZoneM !== undefined) element('temporal-near-zone-m').value = String(extra.nearZoneM);
   if (extra.moving !== undefined) element('train-moving').checked = extra.moving;
   if (extra.matchAxisM) element('temporal-match-axis-m').value = String(extra.matchAxisM);
+  if (extra.reviewLabelStatus) context.manifest.review_label_status = extra.reviewLabelStatus;
   vm.runInNewContext(`${loadShowStatusSource()}\nshowStatus();`, context);
   return {status: element('status'), banner: element('obstacle-distance-banner')};
 }
+
+test('distance label is anchored to the confirmed C++ point, not a rail tick', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'web', 'stage_4_cpu_player_axis_labels.js'), 'utf8');
+  const lines = [];
+  const context = {
+    render() {},
+    result: {nearest_reportable_intrusion_xyz: [0.10284, -3.272428, 0.137223]},
+    effectiveCoreSplit() {
+      return {reportableCount: 1550, nearestDisplayDistance: 3.276918,
+        nearestDistanceBasis: 'source origin', backendMode: 'baseline_v3'};
+    },
+    addLine(_overlay, points) { lines.push(points); },
+    overlay: {},
+  };
+  vm.runInNewContext(source, context);
+  let label;
+  context.axisLabel = (text, position) => { label = {text, position}; };
+  context.obstacleDistanceLabel();
+  assert.equal(label.text, '3.3 м');
+  assert.equal(label.position[1], -3.272428);
+  assert.equal(label.position[2], 0.787223);
+  assert.equal(lines[0][0][1], -3.272428);
+});
+
+test('envelope end label uses the final C++ pair, not the observed rail support', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'web', 'stage_4_cpu_player_axis_labels.js'), 'utf8');
+  const pair = (s) => ({source_s_m: s, left_xyz: [-0.75, -s, 0], right_xyz: [0.75, -s, 0]});
+  const pairs = [pair(3), pair(27), pair(80)];
+  const elements = new Map([
+    ['scene', {appendChild(node) { elements.set(node.id, node); }}],
+    ['core-envelope-layer', {checked: true}],
+    ['axis-layer', {checked: false}],
+  ]);
+  const context = {
+    render() {},
+    result: {
+      rail_pairs_source_xyz: pairs,
+      core_envelope_wireframe_source_xyz: [[0, 0, 0]],
+      observed_support_end_source_s_m: 27,
+      core_bounds_source_axis: [-1.4, 1.4],
+    },
+    effectiveCoreSplit() { return {reportableCount: 0}; },
+    $: (id) => elements.get(id),
+    document: {createElement() { return {id: '', textContent: '', hidden: true}; }},
+  };
+  vm.runInNewContext(source, context);
+  context.render();
+  assert.equal(elements.get('envelope-end-banner').textContent,
+    'Конец габарита: 80.0 м по оси\nПродление после 27.0 м');
+  assert.equal(elements.get('envelope-end-banner').hidden, false);
+
+  const labels = [];
+  context.axisLabel = (text, position, options = {}) => labels.push({text, position, options});
+  context.axisDistanceLabels(pairs);
+  assert.ok(labels.some(({text}) => text === '27.0 м'));
+  assert.equal(labels.filter(({text}) => text.includes('конец габарита')).length, 0);
+  elements.get('axis-layer').checked = true;
+  context.render();
+  assert.equal(elements.get('envelope-end-axis-label').textContent,
+    '80.0 м · конец габарита');
+  assert.equal(elements.get('envelope-end-axis-label').hidden, false);
+
+  elements.get('core-envelope-layer').checked = false;
+  context.render();
+  assert.equal(elements.get('envelope-end-banner').hidden, true);
+  elements.get('core-envelope-layer').checked = true;
+  context.result = {rail_pairs_source_xyz: [], core_envelope_wireframe_source_xyz: []};
+  context.render();
+  assert.equal(elements.get('envelope-end-banner').textContent, '');
+  assert.equal(elements.get('envelope-end-banner').hidden, true);
+});
+
+test('lost rails keep UNKNOWN and age of the last sequential alarm without inventing a current hit', () => {
+  const elements = new Map();
+  const element = (id) => {
+    if (!elements.has(id)) elements.set(id, {value: '', checked: false, textContent: '', className: ''});
+    return elements.get(id);
+  };
+  const context = {
+    $: element,
+    Number,
+    id: () => 'frame',
+    manifest: {dataset: 'fake', frames: Array.from({length: 400}, () => ({}))},
+    current: 216,
+    result: {
+      noise_filter_mode: 'baseline_v3', status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
+      intrusion_candidate_present: true, reportable_core_source_indices: [0],
+      ignored_noise_source_indices: [], nearest_reportable_intrusion_source_index: 0,
+      nearest_reportable_intrusion_distance_from_source_origin_m: 3.3,
+      header_timestamp_ns: 100000000000, rail_pair_count: 10,
+    },
+    xyz: new Float32Array([0, -3.3, 0]), cache: new Map(), componentFilterCache: null,
+    controlObstacles: [],
+  };
+  vm.createContext(context);
+  vm.runInContext(loadShowStatusSource(), context);
+  vm.runInContext('showStatus()', context);
+  context.current = 217;
+  context.result = {
+    noise_filter_mode: 'baseline_v3', status: 'UNKNOWN', reason: 'INSUFFICIENT_PAIRED_RAIL_SUPPORT',
+    intrusion_candidate_present: null, reportable_core_source_indices: [],
+    ignored_noise_source_indices: [], header_timestamp_ns: 100100000000,
+  };
+  vm.runInContext('showStatus()', context);
+  assert.match(element('status').textContent, /UNKNOWN/);
+  assert.match(element('status').textContent, /кадр 216, 0\.1 с назад/);
+  assert.equal(element('obstacle-distance-banner').textContent, '');
+  context.current = 300;
+  vm.runInContext('showStatus()', context);
+  assert.doesNotMatch(element('status').textContent, /Последнее подтверждение/);
+  context.current = 301;
+  context.manifest.dataset_id = 'fake';
+  context.result = {
+    noise_filter_mode: 'baseline_v3', status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
+    intrusion_candidate_present: true, reportable_core_source_indices: [0],
+    ignored_noise_source_indices: [], nearest_reportable_intrusion_source_index: 0,
+    nearest_reportable_intrusion_distance_from_source_origin_m: 3.3,
+    header_timestamp_ns: 101000000000, source_frame: 'lidar_a',
+  };
+  vm.runInContext('showStatus()', context);
+  context.current = 302;
+  context.manifest.dataset_id = 'another_source';
+  context.result = {
+    noise_filter_mode: 'baseline_v3', status: 'UNKNOWN',
+    intrusion_candidate_present: null, reportable_core_source_indices: [],
+    ignored_noise_source_indices: [], header_timestamp_ns: 101100000000,
+    source_frame: 'lidar_a',
+  };
+  vm.runInContext('showStatus()', context);
+  assert.doesNotMatch(element('status').textContent, /Последнее подтверждение/);
+});
+
+test('baseline_v3 boundary warning is not displayed as an intrusion alarm', () => {
+  const {status, banner} = runShowStatus({
+    noise_filter_mode: 'baseline_v3', status: 'OBSERVED_BOUNDARY_WARNING',
+    intrusion_candidate_present: false, reportable_core_source_indices: [],
+    ignored_noise_source_indices: [], rail_pair_count: 16,
+    header_timestamp_ns: '946685849933418989',
+  });
+  assert.match(status.textContent, /точки у границы габарита/);
+  assert.doesNotMatch(status.textContent, /ПРЕДУПРЕЖДЕНИЕ C\+\+:/);
+  assert.equal(banner.textContent, '');
+});
+
+test('experimental early C++ candidate needs three frames and is not a confirmed alarm', () => {
+  const candidate = {
+    noise_filter_mode: 'baseline_v3', status: 'UNKNOWN',
+    intrusion_candidate_present: false, reportable_core_source_indices: [],
+    ignored_noise_source_indices: [0, 1],
+    experimental_early_frame_candidate_present: true,
+    experimental_early_core_count: 143,
+    experimental_early_source_indices: [0, 1],
+    experimental_early_nearest_distance_from_source_origin_m: 69.0,
+    rail_pair_count: 15, header_timestamp_ns: '946685849933418989',
+    source_frame: 'hesai_lidar',
+  };
+  const single = runShowStatus(candidate);
+  assert.equal(single.banner.textContent, '');
+  const cache = new Map([[44, {result: candidate}], [45, {result: candidate}]]);
+  const {status, banner} = runShowStatus(candidate, {cache});
+  assert.equal(banner.textContent, 'Возможное препятствие на 69.0 м');
+  assert.equal(banner.className, 'early');
+  assert.match(status.textContent, /ЭКСПЕРИМЕНТАЛЬНЫЙ РАННИЙ КАНДИДАТ C\+\+/);
+  assert.doesNotMatch(status.textContent, /ПРЕДУПРЕЖДЕНИЕ C\+\+:/);
+  assert.match(status.textContent, /UNKNOWN/);
+});
 
 test('viewer shows the nearest obstacle distance as a top-left scene banner', () => {
   const {banner, status} = runShowStatus({
@@ -88,6 +257,7 @@ test('viewer shows the nearest obstacle distance as a top-left scene banner', ()
     'Препятствие на 27.0 м',
     'distance must be visible in the left-top overlay, not only in the bottom status line',
   );
+  assert.equal(banner.className, 'confirmed');
   assert.match(status.textContent, /ПРЕДУПРЕЖДЕНИЕ/);
 });
 
@@ -166,6 +336,47 @@ test('viewer uses active backend model split instead of old JS thresholds', () =
 
   assert.match(status.textContent, /ПРЕДУПРЕЖДЕНИЕ/);
   assert.equal(banner.textContent, 'Препятствие на 12.0 м');
+});
+
+test('user-confirmed empty new_data labels a C++ alarm as false positive without hiding it', () => {
+  const {banner, status} = runShowStatus({
+    noise_filter_mode: 'baseline_v3', status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
+    intrusion_candidate_present: true, reportable_core_source_indices: [0],
+    ignored_noise_source_indices: [],
+    nearest_reportable_intrusion_source_index: 0,
+    nearest_reportable_intrusion_distance_from_source_origin_m: 12.5,
+    rail_pair_count: 10, header_timestamp_ns: '946692913433331013',
+  }, {reviewLabelStatus: 'user_reported_no_obstacles', xyz: new Float32Array([0, -12.5, 0])});
+  assert.equal(banner.textContent, 'Ложная тревога на 12.5 м');
+  assert.equal(banner.className, 'confirmed');
+  assert.match(status.textContent, /ЛОЖНОПОЛОЖИТЕЛЬНОЕ СРАБАТЫВАНИЕ C\+\+/);
+  assert.match(status.textContent, /1 подтверждённых возвратов/);
+});
+
+test('baseline_v3 viewer keeps a confirmed near obstacle visible while moving', () => {
+  const result = {
+    status: 'OBSERVED_CORE_INTRUSION_CANDIDATE',
+    noise_filter_mode: 'baseline_v3',
+    intrusion_candidate_present: true,
+    core_count: 3,
+    reportable_core_count: 3,
+    reportable_core_source_indices: [0, 1, 2],
+    ignored_noise_source_indices: [],
+    nearest_reportable_intrusion_source_index: 0,
+    nearest_reportable_intrusion_distance_from_source_origin_m: 3.3,
+    rail_pair_count: 2,
+    rail_pairs_source_xyz: [
+      {source_s_m: 2, left_xyz: [-0.75, -2, 0], right_xyz: [0.75, -2, 0]},
+      {source_s_m: 4, left_xyz: [-0.75, -4, 0], right_xyz: [0.75, -4, 0]},
+    ],
+    compute_backend_used: 'cpu',
+    source_frame: 'hesai_lidar',
+    header_timestamp_ns: '946685808633376956',
+  };
+  const xyz = new Float32Array([0, -3.3, 0, 0.02, -3.32, 0, -0.02, -3.31, 0]);
+  const {status, banner} = runShowStatus(result, {xyz, moving: true, nearZoneM: 6});
+  assert.match(status.textContent, /ПРЕДУПРЕЖДЕНИЕ/);
+  assert.equal(banner.textContent, 'Препятствие на 3.3 м');
 });
 
 test('viewer temporal filter suppresses one-frame backend model candidates', () => {

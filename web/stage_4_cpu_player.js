@@ -6,8 +6,115 @@ function pointSet(){const total=xyz.length/3,split=effectiveCoreSplit(),core=new
 function render(){dispose(overlay);dispose(review);overlay=new THREE.Group();review=new THREE.Group();rails();if($('axis-layer').checked&&result.curve_axis_status==='CURVE_AXIS_SUPPORTED')addLine(overlay,result.curve_axis_polyline_source_xyz||[],0xffd34f);bounds();scene.add(overlay);const split=effectiveCoreSplit(),pairs=result.rail_pairs_source_xyz||[],first=pairs[0]?.source_s_m,last=pairs.at(-1)?.source_s_m;const axisRange=Number.isFinite(first)&&Number.isFinite(last)?`${first.toFixed(1)}–${last.toFixed(1)} м* вдоль оси`:'нет поддержанной оси',method=result.rail_selection_method??'не записан',nearMode=split.moving?'ближняя зона шум при движении':'ближняя зона сразу при стоянке';$('cpp-summary').textContent=`Метод: ${method} · Рельсы: ${result.rail_pair_count??0} пар · core raw: ${result.core_count??0} · препятствие: ${split.reportableCount} · шум: ${split.noiseCount} · min: ${split.minPoints} · r: ${split.radius.toFixed(2)} м · span≤${Number.isFinite(split.maxAxisSpan)?split.maxAxisSpan.toFixed(1):'∞'} м · avgD≤${Number.isFinite(split.maxAxisDistance)?split.maxAxisDistance.toFixed(2):'∞'} м · temporal: ${split.requiredFrames}/3 · ${nearMode}≤${split.nearZoneM.toFixed(1)} м · match±${temporalMatchAxisM().toFixed(1)} м · margin: ${result.margin_count??0} · вне reference: ${result.outside_reference_count??0} · UNKNOWN: ${result.unknown_count??0} · ось: ${axisRange}`;for(const a of controlObstacles)marker(a.point,.18,a.membership==='CORE_INTERSECTION'?0xff3f58:a.membership==='MARGIN_INTERSECTION'?0xffc34d:0xc084fc);scene.add(review);const list=$('annotations');list.replaceChildren();if(!controlObstacles.length){list.hidden=true;return}list.hidden=false;for(const a of controlObstacles){const li=document.createElement('li');li.textContent=`${a.event_id}: контрольная помеха · принадлежность габариту ${a.membership}`;list.appendChild(li)}}function marker(p,size,color=0xc084fc){const o=new THREE.Mesh(new THREE.SphereGeometry(size,10,8),new THREE.MeshBasicMaterial({color}));o.position.fromArray(p);review.add(o)}
 function classifyControlObstacles(items){const core=new Set(result.core_source_indices||[]),margin=new Set(result.margin_source_indices||[]),outside=new Set(result.outside_reference_source_indices||[]);return(items||[]).map(item=>{const p=item.anchor_source_coordinates,point=[p.x,p.y,p.z];let index=-1;for(let i=0;i<xyz.length;i+=3)if(Math.abs(xyz[i]-p.x)<=1e-6&&Math.abs(xyz[i+1]-p.y)<=1e-6&&Math.abs(xyz[i+2]-p.z)<=1e-6){index=i/3;break}const membership=index<0?'SOURCE_POINT_NOT_FOUND':core.has(index)?'CORE_INTERSECTION':margin.has(index)?'MARGIN_INTERSECTION':outside.has(index)?'OBSERVED_OUTSIDE_GABARIT':'UNKNOWN';return{...item,point,source_index:index,membership}})}
 function reset(){const box=cloud?.geometry.boundingBox;if(!box)return;const center=box.getCenter(new THREE.Vector3()),span=box.getSize(new THREE.Vector3()),dist=Math.max(span.length(),10)*.7;camera.up.set(0,0,1);if($('view').value==='forward'){camera.position.set(0,0,0);controls.target.set(0,-20,0)}else{controls.target.copy(center);if($('view').value==='top'){camera.up.set(0,1,0);camera.position.copy(center).add(new THREE.Vector3(0,0,dist))}else if($('view').value==='side')camera.position.copy(center).add(new THREE.Vector3(dist,0,0));else camera.position.copy(center).add(new THREE.Vector3(1,.6,.7).normalize().multiplyScalar(dist))}camera.lookAt(controls.target);controls.update()}function pause(){playing=false;clearTimeout(timer);$('play').textContent='▶ Запуск'}function showStatus(){const split=effectiveCoreSplit(),hit=split.reportableCount>0,unknown=result.status==='UNKNOWN',rawCore=Number(result.core_count)>0,noise=split.noiseCount,nearValue=hit?split.nearestDisplayDistance:NaN,nearBasis=split.nearestDistanceBasis==='axis'?'по оси':'от source origin',near=Number.isFinite(nearValue)?nearValue.toFixed(2)+' м*':'',audit=controlObstacles.length?`\nКонтрольные помехи: ${controlObstacles.map(a=>`${a.event_id}=${a.membership}`).join(', ')}`:'';$('obstacle-distance-banner').textContent=hit&&Number.isFinite(nearValue)?`Препятствие на ${nearValue.toFixed(1)} м`:'';$('status').className=hit?'warning':unknown?'unknown':'';$('status').textContent=`${manifest.dataset} · кадр ${current}/${manifest.frames.length-1} · ${result.status}\n${hit?`ПРЕДУПРЕЖДЕНИЕ: ${split.reportableCount} возвратов препятствия внутри габарита; ближайшая ${near} ${nearBasis}.`:rawCore?`Core-компоненты не прошли пороги min=${split.minPoints}, r=${split.radius.toFixed(2)}, span≤${Number.isFinite(split.maxAxisSpan)?split.maxAxisSpan.toFixed(1):'∞'}, avgD≤${Number.isFinite(split.maxAxisDistance)?split.maxAxisDistance.toFixed(2):'∞'}, temporal=${split.requiredFrames}/3 (${noise} возвратов отнесены к шуму); путь не объявляется свободным.`:unknown?'UNKNOWN: путь не объявляется свободным.':'Core-вторжений нет; путь не объявляется свободным.'}\nОсь: ${result.rail_pair_count??0} пар; backend: ${result.compute_backend_used}; frame: ${result.source_frame}; header: ${result.header_timestamp_ns}${audit}`}
-async function loadFramePayload(i,signal){let p=cache.get(i);if(p)return p;const a=await fetch(manifest.frames[i].metadata_url,{signal});if(!a.ok)throw Error('Не удалось получить C++ результат');p=await a.json();if(p.review_annotations_are_detector_input!==false)throw Error('Не подтверждена изоляция контрольной разметки от детектора');const b=await fetch(p.frame.file,{signal});if(!b.ok)throw Error('Не удалось загрузить XYZ');p.xyz=decode(await b.arrayBuffer(),p.frame.displayed_points);cache.set(i,p);while(cache.size>5)cache.delete(cache.keys().next().value);return p}async function show(i){i=Math.max(0,Math.min(manifest.frames.length-1,i));const token=++request;if(pending)pending.abort();pending=new AbortController();$('load-status').textContent=`Загрузка кадра ${i}…`;$('error').textContent='';try{const p=await loadFramePayload(i,pending.signal);if(i>0)await loadFramePayload(i-1,pending.signal).catch(()=>null);if(i<manifest.frames.length-1)await loadFramePayload(i+1,pending.signal).catch(()=>null);if(token!==request)return false;if(p.frame.header_timestamp_ns!==p.result.header_timestamp_ns||p.frame.source_frame!==p.result.source_frame)throw Error('Результат не принадлежит кадру');validateEnvelopeGeometry(p.result);const first=current<0;current=i;frame=p.frame;result=p.result;xyz=p.xyz;controlObstacles=classifyControlObstacles(p.review_annotations);componentFilterCache=null;replaceCloud();render();$('frame-range').value=i;$('frame-number').value=i;$('export-cpp').disabled=false;showStatus();$('load-status').textContent='';if(first)reset();return true}catch(e){if(e.name!=='AbortError'){$('error').textContent=e.message;pause()}return false}}
+async function loadFramePayload(i,signal){let p=cache.get(i);if(p)return p;const a=await fetch(manifest.frames[i].metadata_url,{signal});if(!a.ok)throw Error('Не удалось получить C++ результат');p=await a.json();if(p.review_annotations_are_detector_input!==false)throw Error('Не подтверждена изоляция контрольной разметки от детектора');const b=await fetch(p.frame.file,{signal});if(!b.ok)throw Error('Не удалось загрузить XYZ');p.xyz=decode(await b.arrayBuffer(),p.frame.displayed_points);cache.set(i,p);while(cache.size>5)cache.delete(cache.keys().next().value);return p}async function show(i){i=Math.max(0,Math.min(manifest.frames.length-1,i));const token=++request;if(pending)pending.abort();pending=new AbortController();$('load-status').textContent=`Загрузка кадра ${i}…`;$('error').textContent='';try{const p=await loadFramePayload(i,pending.signal);if(i>0)await loadFramePayload(i-1,pending.signal).catch(()=>null);if(i>1)await loadFramePayload(i-2,pending.signal).catch(()=>null);if(i<manifest.frames.length-1)await loadFramePayload(i+1,pending.signal).catch(()=>null);if(token!==request)return false;if(p.frame.header_timestamp_ns!==p.result.header_timestamp_ns||p.frame.source_frame!==p.result.source_frame)throw Error('Результат не принадлежит кадру');validateEnvelopeGeometry(p.result);const first=current<0;current=i;frame=p.frame;result=p.result;xyz=p.xyz;controlObstacles=classifyControlObstacles(p.review_annotations);componentFilterCache=null;replaceCloud();render();$('frame-range').value=i;$('frame-number').value=i;$('export-cpp').disabled=false;showStatus();$('load-status').textContent='';if(first)reset();return true}catch(e){if(e.name!=='AbortError'){$('error').textContent=e.message;pause()}return false}}
 function schedule(){if(!playing||current>=manifest.frames.length-1){if(current>=manifest.frames.length-1)pause();return}timer=setTimeout(async()=>{if(await show(current+1))schedule()},Math.max(50,100/Number($('speed').value)))}function cancelSeek(){clearTimeout(seekTimer);seekTimer=null}function seekFromSlider(debounce){pause();const index=Number($('frame-range').value);$('frame-number').value=index;cancelSeek();if(debounce)seekTimer=setTimeout(()=>{seekTimer=null;show(index)},frameSeekDebounceMs);else show(index)}function showNow(index){cancelSeek();pause();show(index)}function download(name,value){const u=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 $('play').onclick=()=>{cancelSeek();if(playing)pause();else{playing=true;$('play').textContent='❚❚ Пауза';schedule()}};$('previous').onclick=()=>showNow(current-1);$('next').onclick=()=>showNow(current+1);$('frame-range').oninput=()=>seekFromSlider(true);$('frame-range').onchange=()=>seekFromSlider(false);$('frame-number').onchange=()=>showNow(Number($('frame-number').value));$('view').onchange=reset;$('point-size').oninput=()=>material.size=Number($('point-size').value);$('reset').onclick=reset;const refreshLayers=()=>{componentFilterCache=null;if(current>=0){replaceCloud();render();showStatus()}};for(const x of ['axis-layer','core-envelope-layer','margin-envelope-layer','core-layer','noise-layer','margin-layer','core-only'])$(x).onchange=refreshLayers;for(const x of ['noise-min-points','noise-radius','noise-max-axis-span','noise-max-axis-distance','temporal-required-frames','train-moving','temporal-near-zone-m','temporal-match-axis-m']){$(x).oninput=refreshLayers;$(x).onchange=refreshLayers}$('export-cpp').onclick=()=>download(`cpp_curve_envelope_frame_${current}.json`,{frame,result,note:'CPLUSPLUS_CPU_RESULT_NOT_SAFETY_DECISION'});new ResizeObserver(()=>{const w=$('scene').clientWidth,h=$('scene').clientHeight;camera.aspect=w/Math.max(h,1);camera.updateProjectionMatrix();renderer.setSize(w,h)}).observe($('scene'));(function draw(){requestAnimationFrame(draw);renderer.render(scene,camera)})();if(!window.cpuCatalogSelectedSource){$('load-status').textContent='Выберите датасет.';$('status').textContent='Датасет не выбран. C++ расчёт не запущен.'}else fetch('manifest.json').then(r=>r.json()).then(async m=>{manifest=m;if(m.format!=='lidar-cpu-catalog-v1'||m.safety_decision_permitted!==false||m.compute_backend!=='cpu'||!m.frames?.length)throw Error('Недопустимый C++ catalog');$('frame-range').max=m.frames.length-1;$('frame-number').max=m.frames.length-1;for(const x of ['play','previous','next','frame-range','frame-number'])$(x).disabled=false;await show(Math.min(1050,m.frames.length-1))}).catch(e=>$('error').textContent=e.message);
 function backendModelTemporalComponents(payload,settings){const positions=payload.xyz,value=payload.result,total=positions?.length?positions.length/3:0,raw=(value.reportable_core_source_indices||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<total),axis=axisCenterline(value),visited=new Set(),radius2=settings.radius*settings.radius,candidates=[];for(const seed of raw){if(visited.has(seed))continue;const stack=[seed],component=[];visited.add(seed);while(stack.length){const index=stack.pop();component.push(index);const ax=positions[index*3],ay=positions[index*3+1],az=positions[index*3+2];for(const other of raw){if(visited.has(other))continue;const dx=ax-positions[other*3],dy=ay-positions[other*3+1],dz=az-positions[other*3+2];if(dx*dx+dy*dy+dz*dz>radius2)continue;visited.add(other);stack.push(other)}}candidates.push({indices:component,stats:componentAxisStats(component,axis,positions)})}const noise=(value.ignored_noise_source_indices||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<total);return{candidates,noise}}
-function backendModelSplit(settings){if(!backendFilteredResult(result))return null;const currentComponents=backendModelTemporalComponents({result,xyz},settings),neighborComponents=[cache.get(current-1),cache.get(current+1)].filter(payload=>backendFilteredResult(payload?.result)&&payload.result.noise_filter_mode===result.noise_filter_mode).map(payload=>backendModelTemporalComponents(payload,settings).candidates),reportable=[],noise=[...currentComponents.noise];let nearestIndex=-1,nearestDistance=Infinity;for(const candidate of currentComponents.candidates){const near=candidate.stats&&candidate.stats.nearestAxisDistance<=settings.nearZoneM;if(settings.moving&&near){noise.push(...candidate.indices);continue}let confirmations=1;for(const items of neighborComponents)if(items.some(other=>temporalMatch(candidate,other)))confirmations++;const immediate=!settings.moving&&near,confirmed=immediate||confirmations>=settings.requiredFrames;if(!confirmed){noise.push(...candidate.indices);continue}reportable.push(...candidate.indices);for(const index of candidate.indices){const distance=Math.hypot(xyz[index*3],xyz[index*3+1],xyz[index*3+2]);if(distance<nearestDistance){nearestDistance=distance;nearestIndex=index}}}reportable.sort((a,b)=>a-b);noise.sort((a,b)=>a-b);return{...settings,reportable:new Set(reportable),noise:new Set(noise),reportableIndices:reportable,noiseIndices:noise,reportableCount:reportable.length,noiseCount:noise.length,nearestIndex,nearestDistance,nearestDisplayDistance:nearestDistance,nearestDistanceBasis:'source origin',backendMode:result.noise_filter_mode}}
+function backendModelSplit(settings){
+  if(!backendFilteredResult(result))return null;
+  if(result.noise_filter_mode==='baseline_v3'){
+    const confirmed=result.intrusion_candidate_present===true;
+    const reportable=confirmed?result.reportable_core_source_indices||[]:[];
+    const noise=result.ignored_noise_source_indices||[];
+    const nearestDistance=confirmed&&Number.isFinite(result.nearest_reportable_intrusion_distance_from_source_origin_m)?result.nearest_reportable_intrusion_distance_from_source_origin_m:Infinity;
+    const nearestIndex=confirmed&&Number.isInteger(result.nearest_reportable_intrusion_source_index)?result.nearest_reportable_intrusion_source_index:-1;
+    return{...settings,reportable:new Set(reportable),noise:new Set(noise),reportableIndices:reportable,noiseIndices:noise,reportableCount:reportable.length,noiseCount:noise.length,nearestIndex,nearestDistance,nearestDisplayDistance:nearestDistance,nearestDistanceBasis:'source origin',backendMode:result.noise_filter_mode};
+  }
+  const currentComponents=backendModelTemporalComponents({result,xyz},settings),neighborComponents=[cache.get(current-1),cache.get(current+1)].filter(payload=>backendFilteredResult(payload?.result)&&payload.result.noise_filter_mode===result.noise_filter_mode).map(payload=>backendModelTemporalComponents(payload,settings).candidates),reportable=[],noise=[...currentComponents.noise];
+  let nearestIndex=-1,nearestDistance=Infinity;
+  for(const candidate of currentComponents.candidates){
+    const near=candidate.stats&&candidate.stats.nearestAxisDistance<=settings.nearZoneM;
+    if(settings.moving&&near){noise.push(...candidate.indices);continue}
+    let confirmations=1;
+    for(const items of neighborComponents)if(items.some(other=>temporalMatch(candidate,other)))confirmations++;
+    const immediate=!settings.moving&&near,confirmed=immediate||confirmations>=settings.requiredFrames;
+    if(!confirmed){noise.push(...candidate.indices);continue}
+    reportable.push(...candidate.indices);
+    for(const index of candidate.indices){const distance=Math.hypot(xyz[index*3],xyz[index*3+1],xyz[index*3+2]);if(distance<nearestDistance){nearestDistance=distance;nearestIndex=index}}
+  }
+  reportable.sort((a,b)=>a-b);noise.sort((a,b)=>a-b);
+  return{...settings,reportable:new Set(reportable),noise:new Set(noise),reportableIndices:reportable,noiseIndices:noise,reportableCount:reportable.length,noiseCount:noise.length,nearestIndex,nearestDistance,nearestDisplayDistance:nearestDistance,nearestDistanceBasis:'source origin',backendMode:result.noise_filter_mode};
+}
+
+const legacyReplaceCloud = replaceCloud;
+function earlyRunPresent() {
+  if (current < 2 || result?.experimental_early_frame_candidate_present !== true) return false;
+  const previous = cache.get(current - 1)?.result;
+  const beforePrevious = cache.get(current - 2)?.result;
+  return previous?.experimental_early_frame_candidate_present === true &&
+    beforePrevious?.experimental_early_frame_candidate_present === true &&
+    previous.source_frame === result.source_frame &&
+    beforePrevious.source_frame === result.source_frame;
+}
+replaceCloud = function replaceCloudWithEarlyCandidates() {
+  legacyReplaceCloud();
+  if (result?.noise_filter_mode !== 'baseline_v3' ||
+      result.intrusion_candidate_present === true ||
+      !earlyRunPresent()) return;
+  const early = new Set(result.experimental_early_source_indices || []);
+  const indices = pointSet().indices;
+  const colors = cloud.geometry.getAttribute('color');
+  for (let i = 0; i < indices.length; i++) {
+    if (early.has(indices[i])) colors.setXYZ(i, 1, 0.56, 0.08);
+  }
+  colors.needsUpdate = true;
+};
+
+const legacyShowStatus = showStatus;
+let lastBackendAlarm = null;
+let lastBackendFrame = -1;
+showStatus = function showBackendStatus() {
+  if (result?.noise_filter_mode !== 'baseline_v3') {
+    lastBackendAlarm = null;
+    lastBackendFrame = -1;
+    legacyShowStatus();
+    $('obstacle-distance-banner').className = $('obstacle-distance-banner').textContent ? 'confirmed' : '';
+    return;
+  }
+  const confirmed = result.intrusion_candidate_present === true;
+  const early = !confirmed && earlyRunPresent();
+  const split = effectiveCoreSplit();
+  const unknown = result.status === 'UNKNOWN';
+  if (current !== lastBackendFrame) {
+    if (current !== lastBackendFrame + 1 || (!unknown && !confirmed) ||
+        lastBackendAlarm && (lastBackendAlarm.datasetId !== manifest.dataset_id ||
+          lastBackendAlarm.sourceFrame !== result.source_frame)) lastBackendAlarm = null;
+    if (confirmed) lastBackendAlarm = {
+      frame: current,
+      timestampNs: Number(result.header_timestamp_ns),
+      datasetId: manifest.dataset_id,
+      sourceFrame: result.source_frame,
+    };
+    lastBackendFrame = current;
+  }
+  const distance = confirmed ? split.nearestDisplayDistance : NaN;
+  const falsePositive = confirmed && manifest.review_label_status === 'user_reported_no_obstacles';
+  const ageSeconds = lastBackendAlarm && Number.isFinite(lastBackendAlarm.timestampNs) ?
+    (Number(result.header_timestamp_ns) - lastBackendAlarm.timestampNs) / 1e9 : NaN;
+  const stale = unknown && !confirmed && lastBackendAlarm &&
+    Number.isFinite(ageSeconds) && ageSeconds >= 0 && ageSeconds <= 2;
+  const staleText = stale ? `\nПоследнее подтверждение: кадр ${lastBackendAlarm.frame}, ` +
+    `${ageSeconds.toFixed(1)} с назад; текущее положение не подтверждено.` : '';
+  const audit = controlObstacles.length ? `\nКонтрольные помехи: ` +
+    controlObstacles.map(item => `${item.event_id}=${item.membership}`).join(', ') : '';
+  const earlyDistance = result.experimental_early_nearest_distance_from_source_origin_m;
+  $('obstacle-distance-banner').textContent = confirmed && Number.isFinite(distance) ?
+    `${falsePositive ? 'Ложная тревога' : 'Препятствие'} на ${distance.toFixed(1)} м` :
+    early && Number.isFinite(earlyDistance) ? `Возможное препятствие на ${earlyDistance.toFixed(1)} м` : '';
+  $('obstacle-distance-banner').className = confirmed ? 'confirmed' : early ? 'early' : '';
+  $('status').className = confirmed ? 'warning' : early ? 'prewarning' : unknown ? 'unknown' : '';
+  const decision = confirmed ?
+    `${falsePositive ? 'ЛОЖНОПОЛОЖИТЕЛЬНОЕ СРАБАТЫВАНИЕ C++ (по разметке источника без препятствий)' : 'ПРЕДУПРЕЖДЕНИЕ C++'}: ` +
+      `${split.reportableCount} подтверждённых возвратов внутри габарита; ` +
+      `ближайшая ${Number.isFinite(distance) ? distance.toFixed(2) + ' м' : 'не определена'}.` :
+    early ? `ЭКСПЕРИМЕНТАЛЬНЫЙ РАННИЙ КАНДИДАТ C++ (3 кадра подряд): ${result.experimental_early_core_count} возвратов; ` +
+      `не подтверждён как препятствие, путь не объявляется свободным.` :
+    result.status === 'OBSERVED_BOUNDARY_WARNING' ?
+      `C++ наблюдает точки у границы габарита; подтверждённого вторжения нет, путь не объявляется свободным.` :
+    unknown ? `UNKNOWN: C++ не подтвердил препятствие (${result.reason || 'причина не указана'}); ` +
+      `путь не объявляется свободным.` :
+      `C++ не обнаружил подтверждённого вторжения; путь не объявляется свободным.`;
+  $('status').textContent = `${manifest.dataset} · кадр ${current}/${manifest.frames.length - 1} · ${result.status}\n` +
+    `${decision}${staleText}\nОсь: ${result.rail_pair_count ?? 0} пар; backend: ` +
+    `${result.compute_backend_used}; frame: ${result.source_frame}; header: ${result.header_timestamp_ns}${audit}`;
+};

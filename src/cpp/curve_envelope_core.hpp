@@ -82,6 +82,7 @@ struct AnalysisResult {
   std::size_t baseline_v3_geometry_obstacle_count = 0;
   std::size_t baseline_v3_boundary_warning_count = 0;
   std::size_t baseline_v3_model_assist_count = 0;
+  std::size_t baseline_v3_early_candidate_count = 0;
   std::size_t margin_count = 0;
   std::size_t outside_reference_count = 0;
   std::size_t unknown_count = 0;
@@ -90,9 +91,21 @@ struct AnalysisResult {
   std::vector<std::size_t> baseline_v3_geometry_obstacle_source_indices;
   std::vector<std::size_t> baseline_v3_boundary_warning_source_indices;
   std::vector<std::size_t> baseline_v3_model_assist_source_indices;
+  std::vector<std::size_t> baseline_v3_early_candidate_source_indices;
   NearestPoint nearest_core;
   NearestPoint nearest_reportable_core;
+  NearestPoint nearest_baseline_v3_early_candidate;
   NearestPoint nearest_margin;
+};
+
+struct BaselineV3ComponentProfile {
+  std::size_t point_count = 0;
+  double nearest_source_origin_m = 0.0;
+  double min_x = 0.0, max_x = 0.0;
+  double min_y = 0.0, max_y = 0.0;
+  double min_z = 0.0, max_z = 0.0;
+  double assist_score = -1.0;
+  std::string decision;
 };
 
 struct FrozenNoiseTreeV1Profile {
@@ -105,6 +118,7 @@ struct FrozenNoiseTreeV1Profile {
   double connected_components_and_features_ms = 0.0;
   double tree_decision_ms = 0.0;
   double output_finalize_ms = 0.0;
+  std::vector<BaselineV3ComponentProfile> baseline_v3_components;
 };
 
 // Builds one segment per adjacent pair. Pairs must describe one contiguous run.

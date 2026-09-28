@@ -218,6 +218,9 @@ class CurveEnvelopeNode final : public rclcpp::Node {
                   "\"header_timestamp_ns\":\"" + HeaderTimestampNs(cloud) + "\",\"source_frame\":\"" + JsonEscape(cloud.header.frame_id) +
                   "\",\"curve_axis_status\":\"" + curve_axis_status + "\",\"reason\":\"" + reason +
                   "\",\"safety_decision_permitted\":false,\"intrusion_candidate_present\":null,"
+                  "\"experimental_early_frame_candidate_present\":null,"
+                  "\"experimental_early_core_count\":0,"
+                  "\"experimental_early_nearest_distance_from_source_origin_m\":null,"
                   "\"reportable_intrusion_candidate_present\":null,\"raw_core_return_present\":null,"
                   "\"all_core_returns_are_intrusion_candidates\":false,\"margin_return_present\":null,"
                   "\"compute_backend_requested\":\"" + BackendRequestName() +
@@ -245,6 +248,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
                   "\"core_bounds_source_axis\":null,\"expanded_bounds_source_axis\":null,"
                   "\"core_envelope_wireframe_source_xyz\":[],\"expanded_envelope_wireframe_source_xyz\":[],"
                   "\"core_source_indices\":[],\"reportable_core_source_indices\":[],"
+                  "\"experimental_early_source_indices\":[],"
                   "\"ignored_noise_source_indices\":[],\"margin_source_indices\":[]}";
     publisher_->publish(output);
   }
@@ -444,7 +448,18 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         << ",\"baseline_v3_geometry_obstacle_count\":" << result.baseline_v3_geometry_obstacle_count
         << ",\"baseline_v3_boundary_warning_count\":" << result.baseline_v3_boundary_warning_count
         << ",\"baseline_v3_model_assist_count\":" << result.baseline_v3_model_assist_count
-        << ",\"baseline_v3_geometry_intrusion_candidate_present\":"
+        << ",\"experimental_early_frame_candidate_present\":"
+        << (noise_filter_mode_ == "baseline_v3" && result.baseline_v3_early_candidate_count > 0 ? "true" : "false")
+        << ",\"experimental_early_core_count\":"
+        << (noise_filter_mode_ == "baseline_v3" ? result.baseline_v3_early_candidate_count : 0)
+        << ",\"experimental_early_nearest_distance_from_source_origin_m\":";
+    if (noise_filter_mode_ == "baseline_v3" && result.baseline_v3_early_candidate_count > 0) {
+      json << result.nearest_baseline_v3_early_candidate.distance_from_source_origin_m;
+    } else {
+      json << "null";
+    }
+    json
+         << ",\"baseline_v3_geometry_intrusion_candidate_present\":"
         << (baseline_v3_geometry_intrusion ? "true" : "false")
         << ",\"baseline_v3_boundary_warning_present\":"
         << (baseline_v3_boundary_warning ? "true" : "false")
@@ -520,6 +535,13 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       if (!first_reportable_index) json << ',';
       json << index;
       first_reportable_index = false;
+    }
+    json << "],\"experimental_early_source_indices\":[";
+    bool first_early_index = true;
+    for (const auto index : result.baseline_v3_early_candidate_source_indices) {
+      if (!first_early_index) json << ',';
+      json << index;
+      first_early_index = false;
     }
     json << "],\"ignored_noise_source_indices\":[";
     bool first_noise_index = true;
