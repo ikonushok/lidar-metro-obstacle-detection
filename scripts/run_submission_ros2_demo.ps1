@@ -1,4 +1,5 @@
 param(
+    [Alias('RecordingPath')]
     [string]$BagPath = '',
     [string]$Image = 'lidar-metro-obstacle-detection:submission',
     [string]$ContainerName = 'lidar-detector',
@@ -23,10 +24,13 @@ if ([string]::IsNullOrWhiteSpace($BagPath)) {
     $BagPath = Join-Path $projectRoot 'dataset\extracted\doubleT_obstacle'
 }
 
+if (-not (Test-Path -LiteralPath $BagPath -PathType Container)) {
+    throw "ROS2 recording folder not found: $BagPath"
+}
 $resolvedBag = (Resolve-Path -LiteralPath $BagPath).Path
 $metadata = Join-Path $resolvedBag 'metadata.yaml'
 if (-not (Test-Path -LiteralPath $metadata)) {
-    throw "BagPath must point to an extracted ROS2 bag directory with metadata.yaml: $resolvedBag"
+    throw "-RecordingPath must point to an extracted ROS2 recording folder with metadata.yaml: $resolvedBag"
 }
 
 $existing = @(& docker ps -a --filter "name=^/$ContainerName$" --format '{{.Names}}')
@@ -61,11 +65,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Detector container failed to start.' }
 
 Write-Output "Detector started: $ContainerName"
 Write-Output "Runtime: baseline_v3, development_candidate, tangent, source_frame=$SourceFrame, input_topic=$InputTopic"
-Write-Output "Inspect bag:"
+Write-Output "Inspect recording:"
 Write-Output "  docker exec -it $ContainerName /ros_entrypoint.sh ros2 bag info /data"
 Write-Output "Read detector JSON:"
 Write-Output "  docker exec -it $ContainerName /ros_entrypoint.sh ros2 topic echo $OutputTopic std_msgs/msg/String --field data"
-Write-Output "Play bag:"
+Write-Output "Play recording:"
 Write-Output "  docker exec -it $ContainerName /ros_entrypoint.sh ros2 bag play /data --rate $Rate --read-ahead-queue-size $ReadAheadQueueSize"
 Write-Output "Stop:"
 Write-Output "  docker stop $ContainerName"

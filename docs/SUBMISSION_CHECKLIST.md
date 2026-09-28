@@ -11,6 +11,7 @@ pipeline`: geometry-first gate, boundary warning и temporal model-assist тол
 ## 1. Репозиторий
 
 - Репозиторий содержит исходники, Dockerfile, конфиги, тесты и документацию.
+- Для запуска плеера одной командой присутствуют `compose.yaml` и `scripts/run_compose_player.sh`.
 - `dataset/`, `artefacts/`, `log/`, `.venv/`, `.idea/` и большие бинарные
   артефакты не tracked.
 - В корне есть `README.md` с локальным запуском и `SOLUTION.md` с архитектурой,
@@ -38,7 +39,7 @@ python .\scripts\check_submission_package.py --require-clean
 python .\scripts\prepare_hackathon_datasets.py
 ```
 
-Для ROS2/headless-сценария распаковывается только нужный bag:
+Для ROS2-сценария распаковывается только нужная запись:
 
 ```powershell
 python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
@@ -47,6 +48,12 @@ python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
 ## 3. Прототип / плеер
 
 Минимальная демонстрация текущего исполняемого `baseline_v3` runtime:
+
+```bash
+docker compose up --build
+```
+
+Ручной PowerShell launcher остаётся альтернативой:
 
 ```powershell
 .\scripts\run_stage_2_cpu_player.ps1 `

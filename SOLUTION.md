@@ -46,13 +46,13 @@
 
 ## 3. Входные данные
 
-Ожидаемый runtime-вход — ROS2 bag с сообщениями
+Ожидаемый runtime-вход — запись ROS2 с сообщениями
 `sensor_msgs/msg/PointCloud2`.
 
 Поддерживаемые практические варианты:
 
 - direct player/catalog: архивы в `dataset/for_hackathon`;
-- headless ROS2: распакованный bag-каталог в `dataset/extracted/<source>`.
+- headless ROS2: папка с распакованной записью в `dataset/extracted/<source>`.
 
 Для player-сценария проверки используются три локальных архива без расширения:
 
@@ -87,7 +87,7 @@ PointCloud2 / XYZ
 Direct player:
 
 ```text
-архив bag -> XYZ -> C++ stdin/stdout -> HTTP JSON -> web player
+архив записи -> XYZ -> C++ stdin/stdout -> HTTP JSON -> web player
 ```
 
 ROS2 path:
@@ -193,11 +193,11 @@ http://localhost:8100/
 Пример для распакованного `dataset/extracted/doubleT_obstacle`:
 
 ```powershell
-$bagPath = (Resolve-Path 'dataset/extracted/doubleT_obstacle').Path
+$recordingDir = (Resolve-Path 'dataset/extracted/doubleT_obstacle').Path
 
 docker run --rm -d --name lidar-detector --shm-size=1g `
   -e ROS_DOMAIN_ID=172 -e ROS_LOCALHOST_ONLY=1 `
-  --mount "type=bind,source=$bagPath,target=/data,readonly" `
+  --mount "type=bind,source=$recordingDir,target=/data,readonly" `
   lidar-metro-obstacle-detection:submission `
   ros2 run lidar_mosmetro3d_cpp curve_envelope_node --ros-args `
   -p input_topic:=/sensing/lidar/hesai128/pointcloud `
@@ -230,8 +230,29 @@ docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 0.2
 docker stop lidar-detector
 ```
 
-Для нового bag нужно заменить `input_topic` по выводу `ros2 bag info`, а
+Для новой записи нужно заменить `input_topic` по выводу `ros2 bag info`, а
 `source_frame` — по фактическому `header.frame_id` PointCloud2.
+
+На Ubuntu команды `docker` те же; пример для папки с распакованной записью:
+
+```bash
+docker build -t lidar-metro-obstacle-detection:submission .
+recording_dir="$(realpath /data/lidar_run_01)"
+docker run --rm -d --name lidar-detector --shm-size=1g \
+  -e ROS_DOMAIN_ID=172 -e ROS_LOCALHOST_ONLY=1 \
+  --mount "type=bind,source=$recording_dir,target=/data,readonly" \
+  lidar-metro-obstacle-detection:submission \
+  ros2 run lidar_mosmetro3d_cpp curve_envelope_node --ros-args \
+  -p input_topic:=/your/pointcloud -p source_frame:=your_lidar_frame \
+  -p output_topic:=/stage_3/curve_envelope_candidate \
+  -p compute_backend:=cpu -p rail_selection_method:=development_candidate \
+  -p rail_forward_min_m:=2.0 -p forward_extension_method:=tangent \
+  -p noise_filter_mode:=baseline_v3
+```
+
+Команды `docker exec` для чтения выхода и воспроизведения записи приведены выше:
+они одинаковы для PowerShell и Bash. Перед повторным запуском остановите
+контейнер через `docker stop lidar-detector`.
 
 ## 8. Подтверждённые проверки текущего среза
 
@@ -268,7 +289,7 @@ C++ compute p95 держится около `52` мс, а full HTTP path име�
 
 - Геометрия габарита имеет статус engineering assumption: нет внешней
   калибровки монтажа, `/tf`, карты, IMU и одометрии.
-- `source_frame` и направление движения должны быть проверены для нового bag.
+- `source_frame` и направление движения должны быть проверены для новой записи.
 - Расстояние считается от начала координат исходного облака, не от носа поезда.
 - `baseline_v3` — единая runtime-policy модель; её внутренний слабый score не
   является safety-доказательством свободного пути.
@@ -287,7 +308,7 @@ C++ compute p95 держится около `52` мс, а full HTTP path име�
 Dockerfile                                      Docker/ROS2 Humble image для сборки C++ ядра и запуска demo.
 README.md                                      Основная инструкция по данным, player, ROS2 replay и ограничениям.
 SOLUTION.md                                    Описание архитектуры, алгоритма, проверок и границ решения.
-scripts/prepare_hackathon_datasets.py          Подготовка локальных архивов и распаковок bag для player/ROS2.
+scripts/prepare_hackathon_datasets.py          Подготовка локальных архивов и распаковок записей для player/ROS2.
 scripts/run_stage_2_cpu_player.ps1             Запуск direct C++ HTTP-плеера с выбранными runtime-параметрами.
 scripts/run_submission_ros2_demo.ps1           Headless ROS2 wrapper: detector container, topic echo и bag play команды.
 scripts/serve_stage_2_cpu_catalog.py           HTTP catalog/player server для подготовленных локальных датасетов.

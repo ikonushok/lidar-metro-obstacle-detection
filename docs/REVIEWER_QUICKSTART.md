@@ -1,5 +1,7 @@
 # Быстрый запуск плеера для проверяющих
 
+Для запуска с автоматической подготовкой используйте [Docker Compose](../README.md#плеер-с-архивами-организаторов). Ниже описан ручной путь через PowerShell launcher.
+
 Цель: открыть браузерный плеер со всеми текущими source IDs без ручной перекладки файлов. Алгоритм не дообучается и не меняется: это только подготовка локальных данных, сборка Docker-образа и запуск HTTP-плеера.
 
 ## 1. Положить сырые датасеты
@@ -30,7 +32,7 @@ python .\scripts\prepare_hackathon_datasets.py
 
 Скрипт создаёт `dataset/for_hackathon/for_hackathon`, `dataset/for_hackathon/new_data` и `dataset/for_hackathon/cloud_with_fake_obj`. Если возможно, используются hardlink-и, чтобы не копировать десятки гигабайт; если hardlink недоступен, файл копируется. Если входной файл `.zst`, нужен установленный `zstd`.
 
-Для optional ROS2/headless-проверки можно распаковать отдельные bag-каталоги:
+Для дополнительной ROS2-проверки можно распаковать отдельные записи:
 
 ```powershell
 python .\scripts\prepare_hackathon_datasets.py `
@@ -93,7 +95,7 @@ $manifest | Select-Object dataset_id,frame_count,runtime_transport,noise_filter_
 python .\scripts\check_submission_package.py
 ```
 
-Скрипт проверяет, что в Git не tracked локальные датасеты, архивы ROS2 bag,
+Скрипт проверяет, что в Git не попали локальные датасеты, архивы записей ROS2,
 видео, презентации, `.env` и ключи, а также что присутствуют обязательные
 файлы сдачи. Для уже зафиксированного release-коммита можно добавить
 `--require-clean`.
@@ -114,7 +116,7 @@ python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
 
 По умолчанию wrapper печатает replay-команду с `--rate 0.2` и
 `--read-ahead-queue-size 20`: это проверенный demo-режим для большого
-`doubleT_obstacle` bag на Windows/Docker bind mount. `--rate 1.0` использовать
+записи `doubleT_obstacle` на Windows/Docker bind mount. `--rate 1.0` использовать
 только как отдельную throughput-проверку с фиксацией starvation/drops/ресурсов.
 
 ## Ограничения демо

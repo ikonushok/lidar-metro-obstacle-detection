@@ -1,0 +1,9 @@
+services:
+  player:
+    build: .
+    image: lidar-mosmetro3d:stage-4-cpu-viewer
+    ports:
+      - "127.0.0.1:8100:8000"
+    volumes:
+      - ./dataset:/app/dataset
+    command: ["/bin/sh", "/app/scripts/run_compose_player.sh"]

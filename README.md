@@ -1,307 +1,59 @@
 <p align="center">
-  <img src="./assets/readme/hero.png" width="100%" alt="lidar-metro-obstacle-detection — обнаружение нештатной геометрии по 3D-лидару в тоннеле метро">
+  <img src="./assets/readme/hero.png" width="100%" alt="Обнаружение препятствий по данным 3D-лидара в тоннеле метро">
 </p>
 
 # lidar-metro-obstacle-detection
 
-Экспериментальный модуль обнаружения препятствий в габарите движения поезда метро по облакам 3D-лидара.
+Экспериментальный модуль обнаружения препятствий в габарите движения поезда метро по облакам 3D-лидара. Текущий алгоритм — `baseline_v3`: C++ ядро с браузерным плеером для записей и отдельным ROS2-входом для `PointCloud2`.
 
-Актуальная версия для дальнейшей/финальной сдачи — **`baseline_v3` runtime pipeline**. Это не одна ML-модель, а составная C++/ROS2-логика: geometry-first gate по габариту, boundary/warning для внешних или верхних объектов и temporal model-assist только для слабых/неочевидных случаев. Если temporal-ветка не подтверждает такой случай, результат остаётся `UNKNOWN`, не `CLEAR`.
+[**Открыть схему архитектуры →**](assets/diagrams/solution_architecture.svg) Схема показывает путь от облака точек до результата; [два способа запуска](assets/diagrams/readme_launch_paths.svg) используют одно ядро.
 
-Два способа запуска используют общее C++ ядро:
-
-| Задача | Вход и выход | Нужен ли плеер |
-|---|---|---|
-| Исследование записей | Архив bag → XYZ → прямой C++ → JSON → HTTP-плеер | Да, для просмотра |
-| Проверка заказчиком / сдача | ROS2 PointCloud2 → C++ node → ROS2 String с JSON | Нет |
-
-![Два способа проверить решение](assets/diagrams/readme_launch_paths.svg)
-
-Актуальные проверочные отчёты вынесены в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) и [headless ROS2 demo](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md). Это ограниченные проверки интерфейсов и воспроизводимости, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
-
-Среда сдачи по [ТЗ](docs/hackathon_documentations/5.%20ДепТранспорта.pdf): **Ubuntu 22.04 + ROS 2 Humble + Docker**. Проект подготовлен для [«Лидеров цифровой трансформации»](https://i.moscow/cabinet/hackaton/lct/contest/1233bb5506bc455f86d534b3b40171f1).
-
-## Как работает актуальный runtime
-
-Актуальный direct/ROS2 путь:
+Конвейер обработки:
 
 ```text
-PointCloud2 / XYZ
-  → проверка входа → поиск наблюдаемых пар рельсов
-  → ось и габарит с synthetic tangent-продолжением
-  → geometry-first gate:
-      явно внутри габарита → obstacle
-      явно вне/выше габарита → boundary/warning, не obstacle
-      слабый/маленький/неочевидный случай → temporal model-assist
-  → если temporal model-assist не подтвердил → UNKNOWN
+облако точек → проверка входа → поиск рельсов → габарит движения
+             → geometry-first / boundary / temporal model-assist
+             → кандидат препятствия, расстояние и diagnostics
 ```
 
-Выбор пар — `development_candidate`; диапазон поиска — 2–80 м. Синтетическое продолжение габарита отличается от наблюдаемой рельсовой опоры и отмечается в результате. 80 м — параметр, а не измеренная дальность обнаружения. Финальная передаваемая модель описана как единый `baseline_v3` runtime policy в [models/baseline_v3_runtime_policy.json](models/baseline_v3_runtime_policy.json); метод и границы описаны в [методологии](docs/METHODOLOGY.md), численные ограничения — в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
+## Проверка на данных проверяющего
 
-## Где должны лежать данные
+Основной путь для новых данных: `ros2 bag play → PointCloud2 → curve_envelope_node → JSON`. Проверяющий предоставляет **папку с записью лидара**: внутри должны быть `metadata.yaml` и файлы `.db3`. В ROS2 такая запись называется bag. Узнайте PointCloud2-топик через `ros2 bag info`, а `source_frame` — из `header.frame_id` сообщения. Имя топика не определяет frame.
 
-Данные не входят в Git и Docker image. Команды запуска ничего не скачивают.
-
-Для **C++ CPU player/catalog** нужны три **TAR-файла без расширения** в каталоге
-`dataset/for_hackathon/`:
-
-```text
-dataset/for_hackathon/for_hackathon          # шесть исходных сцен
-dataset/for_hackathon/new_data               # новый длинный проезд
-dataset/for_hackathon/cloud_with_fake_obj    # fake obstacle dataset
-```
-
-Если TAR-файлы уже лежат в `dataset/raw/`, не копируйте десятки гигабайт:
-создайте hardlink-и из PowerShell в корне проекта:
+На Windows с Docker Desktop запустите детектор из корня проекта, указав путь к папке с записью и параметры облака точек:
 
 ```powershell
-New-Item -ItemType Directory -Force dataset\for_hackathon | Out-Null
-New-Item -ItemType HardLink -Path dataset\for_hackathon\for_hackathon -Target dataset\raw\for_hackathon
-New-Item -ItemType HardLink -Path dataset\for_hackathon\new_data -Target dataset\raw\new_data
-New-Item -ItemType HardLink -Path dataset\for_hackathon\cloud_with_fake_obj -Target dataset\raw\cloud_with_fake_obj
+.\scripts\run_submission_ros2_demo.ps1 `
+  -RecordingPath 'D:\data\lidar_run_01' `
+  -InputTopic '/your/pointcloud' `
+  -SourceFrame 'your_lidar_frame' `
+  -BuildImage -StopExisting
 ```
 
-Проверка:
+Скрипт печатает команды для просмотра JSON и воспроизведения записи. Выходной топик — `/stage_3/curve_envelope_candidate`; в JSON проверяйте `intrusion_candidate_present`, ближайшее расстояние, `status` и `reason`. Подробный сценарий с командами ROS2 и вариант для Ubuntu: [SOLUTION.md](SOLUTION.md#74-запустить-headless-ros2-replay).
 
-```powershell
-Get-Item dataset\for_hackathon\for_hackathon, `
-         dataset\for_hackathon\new_data, `
-         dataset\for_hackathon\cloud_with_fake_obj
+## Плеер с архивами организаторов
+
+Для просмотра известных записей в браузере нужен работающий Docker с Compose. Положите три архива в `dataset/raw/`: `for_hackathon`, `new_data`, `cloud_with_fake_obj`. Данные не входят в Git и не скачиваются автоматически; допустимые расширения описаны в [инструкции подготовки](docs/REVIEWER_QUICKSTART.md).
+
+```bash
+docker compose up --build
 ```
 
-Также нужны локальные viewer-assets и XML, которые launcher проверяет до сборки.
-**`-RebuildImage` собирает образ, но не создаёт данные, viewer-assets или XML.**
-[Однократная подготовка](docs/PLAYER_SETUP.md) описывает их получение.
+Команда собирает образ Ubuntu 22.04 / ROS 2 Humble, при необходимости подготавливает архивы и запускает direct C++ плеер с `baseline_v3`. Откройте [http://localhost:8100/](http://localhost:8100/). Для остановки выполните `docker compose down`. Плеер перечисляет известные источники; **для новой записи используйте ROS2-вход выше**.
 
-Для **нового датасета заказчика** используйте ROS2-вход ниже, а не CPU catalog:
-catalog сейчас перечисляет известные источники из `dataset/for_hackathon`.
-Заказчик должен предоставить распакованный ROS2 bag-каталог с `metadata.yaml`
-и `.db3`-файлами. Путь к нему подставляется в `$bagPath`; `input_topic` и
-`source_frame` берутся из `ros2 bag info` и `header.frame_id` PointCloud2.
+## Результат и границы
 
-## C++ CPU player: прямой запуск алгоритма
-
-Текущий режим плеера: `development_candidate`, `RailForwardMinM=2`, `tangent`, `baseline_v3`.
-
-```text
-Кадр из bag → XYZ → постоянный C++-процесс через stdin
-  → поиск рельсов → габарит tangent → компоненты CORE
-  → baseline_v3: geometry/boundary/model-assist/UNKNOWN → JSON через stdout → плеер
-```
-
-Плеер использует `DirectDetailedCpuRuntime`: каждый запрошенный кадр передаётся C++ один раз. В этом режиме не запускаются ROS2-узлы, DDS и цикл повторной публикации PointCloud2. Библиотеки ROS остаются в образе для чтения bag/десериализации сообщений. Первое открытие источника может занимать время из-за извлечения SQLite из архива.
-
-При обновлении обученной модели этот прямой C++ путь сохраняется. ROS2 остаётся отдельным входом в общее ядро и не добавляется в обработку кадров плеера. После обучения скорость новой модели сравнивается с текущей на одинаковом прямом пути; общность ядра сама по себе не гарантирует одинаковое время разных моделей.
-
-При запущенном Docker Desktop из корня репозитория, после [подготовки архивов и файлов плеера](docs/PLAYER_SETUP.md):
-
-```powershell
-docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
-.\scripts\run_stage_2_cpu_player.ps1 `
-  -Port 8100 `
-  -RailSelectionMethod development_candidate `
-  -RailForwardMinM 2 `
-  -ForwardExtensionMethod tangent `
-  -NoiseFilterMode baseline_v3 `
-  -RebuildImage
-```
-
-Откройте [http://localhost:8100/](http://localhost:8100/), выберите датасет и нажмите **▶ Запуск**. Плеер получает облако и соответствующий JSON от C++; в режиме `baseline_v3` использует готовые индексы obstacle/boundary/model-assist/noise и геометрию. `CORE` до фильтра может содержать инфраструктуру; boundary/warning и `UNKNOWN` не означают подтверждённый свободный путь.
-
-Для сдачи и smoke-запуска использовать команду выше с
-`-NoiseFilterMode baseline_v3`.
-
-Проверить выбранный режим и один результат:
-
-```powershell
-$manifest = Invoke-RestMethod 'http://localhost:8100/api/cpu_sources/doubleT_obstacle/manifest.json'
-$manifest | Select-Object runtime_transport, noise_filter_mode, rail_selection_method, rail_search_config, forward_extension_config
-$frame = Invoke-RestMethod 'http://localhost:8100/api/cpu_sources/doubleT_obstacle/14.json' -TimeoutSec 60
-$frame.result | Select-Object intrusion_candidate_present, reportable_core_count, nearest_reportable_intrusion_distance_from_source_origin_m, status, system_status, safety_decision_permitted
-```
-
-Ожидаются `direct_cpp`, `baseline_v3`, `development_candidate`, начало поиска `2`, метод `tangent`. Для последовательности `doubleT_obstacle` frame 13 является первым model-assist alarm и ждёт temporal confirmation; frame 14 подтверждается как кандидат. `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняются. Холодное чтение SQLite может увеличить ожидание; тайм-аут HTTP-клиента не останавливает обработку на сервере.
-
-Отдельная проверка совпадения прямого плеера с ROS2-входом:
-
-```powershell
-.\scripts\validate_ros_model_pipeline.ps1 -Port 8100
-```
-
-В manifest и JSON плеера должны быть `runtime_transport=direct_cpp`, `noise_filter_mode=baseline_v3`. Валидатор отдельно запускает ROS2 в тестовом контейнере и сверяет direct/ROS2 на одинаковом входе; самому плееру ROS2-транспорт не нужен. Для проверки нужны сохранённые XYZF и extracted bag `doubleT_obstacle`; это проверка интеграции, не независимого качества модели.
-
-Исторический явный `-RailSelectionMethod baseline` остаётся совместимым режимом launcher'а, но маршрут для сдачи — `development_candidate` + direct C++ player и отдельный headless ROS2 wrapper. Отдельной опции измерения окна в launcher'е больше нет.
-
-Остановить плеер:
-
-```powershell
-docker ps -q --filter "publish=8100" | ForEach-Object { docker stop $_ }
-```
-
-## ROS2-вход для сдачи и потоковой демонстрации
-
-По ТЗ §3.3 решение должно подключаться к ROS2, а §4 и §8.6 предусматривают демонстрацию через `ros2 bag play`. Это не требует ROS2-транспорта внутри плеера. Для сдачи сохранён отдельный `curve_envelope_node`:
-
-```text
-ros2 bag play → PointCloud2 → C++ ROS2-узел
-  → те же AutoRails / tangent / компоненты / baseline_v3
-  → ROS2-результат (std_msgs/String с JSON)
-```
-
-Оба входа используют общее C++-ядро. ROS2-узел вызывает алгоритм внутри своего процесса; запуск плеера не требуется. Входной топик и `source_frame` задаются параметрами под bag, выходной топик по умолчанию — `/stage_3/curve_envelope_candidate`. Основные параметры совпадают с плеером: `rail_selection_method=development_candidate`, `rail_forward_min_m=2.0`, `forward_extension_method=tangent`, `noise_filter_mode=baseline_v3`.
-
-Текущее разделение заменяет промежуточную интеграцию, при которой каждый кадр плеера передавался через DDS. Маршрут: direct player для просмотра подготовленных источников и отдельный headless ROS2 path для `ros2 bag play`.
-
-Для быстрого headless demo можно использовать единый wrapper:
-
-```powershell
-.\scripts\run_submission_ros2_demo.ps1 -BuildImage -StopExisting
-```
-
-Скрипт запускает detector container с `baseline_v3` и печатает готовые команды
-для `ros2 topic echo`, `ros2 bag info` и `ros2 bag play`. Флаг `-Play` сразу
-запускает replay в том же окне; для демонстрации JSON-выхода удобнее оставить
-replay отдельной командой и параллельно открыть `topic echo`.
-
-### Пошаговый запуск без плеера
-
-Команды ниже выполняются в **PowerShell из корня проекта** при работающем Docker Desktop. Пример использует уже распакованный `dataset/extracted/doubleT_obstacle`: каталог должен содержать `metadata.yaml` и `.db3`. Заказчик может подставить абсолютный путь к своему распакованному bag в `$bagPath`.
-
-Для нового датасета заказчика сначала задайте путь и посмотрите доступные
-топики:
-
-```powershell
-$bagPath = 'D:\customer_data\some_ros2_bag'
-docker run --rm --mount "type=bind,source=$bagPath,target=/data,readonly" `
-  lidar-mosmetro3d:stage-4-cpu-viewer /ros_entrypoint.sh ros2 bag info /data
-```
-
-В командах ниже замените:
-
-- `$bagPath` — на путь к распакованному bag заказчика;
-- `input_topic` — на PointCloud2-топик из `ros2 bag info`;
-- `source_frame` — на реальный `header.frame_id` PointCloud2. Если frame
-  неизвестен, сначала просмотрите одно сообщение через `ros2 topic echo`;
-  подстановка имени топика вместо frame не является калибровкой.
-
-**1. Собрать образ и запустить детектор в фоне:**
-
-```powershell
-docker build -t lidar-mosmetro3d:stage-4-cpu-viewer .
-$bagPath = (Resolve-Path 'dataset/extracted/doubleT_obstacle').Path
-
-docker run --rm -d --name lidar-detector --shm-size=1g `
-  -e ROS_DOMAIN_ID=172 -e ROS_LOCALHOST_ONLY=1 `
-  --mount "type=bind,source=$bagPath,target=/data,readonly" `
-  lidar-mosmetro3d:stage-4-cpu-viewer `
-  ros2 run lidar_mosmetro3d_cpp curve_envelope_node --ros-args `
-  -p input_topic:=/sensing/lidar/hesai128/pointcloud `
-  -p source_frame:=lidar_livox `
-  -p output_topic:=/stage_3/curve_envelope_candidate `
-  -p compute_backend:=cpu `
-  -p rail_selection_method:=development_candidate `
-  -p rail_forward_min_m:=2.0 `
-  -p forward_extension_method:=tangent `
-  -p noise_filter_mode:=baseline_v3
-```
-
-Несмотря на имя образа, HTTP-сервер и плеер этой командой не запускаются. Детектор, bag player и просмотр результата работают в одном контейнере. Для больших облаков используется SHM-профиль образа; 1 GiB shared memory оставляет место для детектора, bag player, `topic echo` и ROS2 daemon. При 512 MiB в этом сценарии наблюдалась ошибка создания SHM-сегмента.
-
-**2. В отдельном окне PowerShell начать чтение результата:**
-
-```powershell
-docker exec -it lidar-detector /ros_entrypoint.sh `
-  ros2 topic echo /stage_3/curve_envelope_candidate std_msgs/msg/String --field data
-```
-
-**3. В третьем окне проиграть bag:**
-
-```powershell
-docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag info /data
-docker exec -it lidar-detector /ros_entrypoint.sh ros2 bag play /data --rate 0.2 --read-ahead-queue-size 20
-```
-
-`/ros_entrypoint.sh` подготавливает окружение ROS для каждой команды `docker exec`. `--rate 0.2` и `--read-ahead-queue-size 20` выбраны как стабильный demo-режим на Windows/Docker bind mount; это не проверка производительности при исходной частоте. Для отдельной throughput-проверки можно поставить `--rate 1.0`, но тогда нужно фиксировать очереди, drops, starvation warnings, ресурсы и число полученных результатов. После конца bag можно повторить `ros2 bag play`, не перезапуская детектор.
-
-При проверке этого сценария на Windows/Docker получен JSON детектора. В режиме `--rate 1.0 --read-ahead-queue-size 2` наблюдалось предупреждение `Message queue starved` при чтении большого bag с bind mount. Оно означает задержки подачи сообщений: для такого запуска исходный темп не гарантирован. Для оценки производительности на стенде отдельно измеряются чтение, обработка и число полученных результатов.
-
-В окне результата появляются JSON-сообщения: `intrusion_candidate_present`, `nearest_reportable_intrusion_distance_from_source_origin_m`, `status`, `reason`, `source_frame`, `header_timestamp_ns`. `runtime_transport=ros2` и `noise_filter_mode=baseline_v3` подтверждают выбранный путь. Расстояние отсчитывается от начала координат исходного облака; отсутствие поддержанного результата даёт `UNKNOWN`/`null`, а не доказательство свободного пути. `system_status=UNKNOWN` и `safety_decision_permitted=false` сохраняют статус экспериментального candidate-only решения.
-
-Для другого bag нужно согласовать `input_topic` с `ros2 bag info`, а `source_frame` — с реальным `header.frame_id` PointCloud2. В примере `doubleT_obstacle` топик содержит `hesai128`, но frame равен **`lidar_livox`**; имя топика не определяет систему координат. Подстановка frame сама по себе не подтверждает калибровку или геометрию нового источника.
-
-**4. Остановить детектор:**
-
-```powershell
-docker stop lidar-detector
-```
-
-На стенде Ubuntu те же команды `docker` выполняются из Bash: для пути используйте `bagPath="$(realpath dataset/extracted/doubleT_obstacle)"`, `$bagPath` в mount и обратную косую черту `\` вместо PowerShell-backtick для переноса строк. Внутренние команды ROS2 остаются теми же. Для автоматической проверки можно подписаться на выходной топик или записать его через `ros2 bag record`; браузер не требуется.
-
-## Результат и ограничения
-
-| Поле / слой | Смысл |
-|---|---|
-| Raw CORE | Все наблюдаемые точки внутри текущего габарита до модели |
-| Reportable / `intrusion_candidate_present` | Компоненты, которые `baseline_v3` поднимает как obstacle: strong geometry или temporal-confirmed model assist |
-| Boundary warning / ignored noise | Внешние/верхние boundary-компоненты и неподтверждённые слабые случаи не становятся `CLEAR`; raw CORE остаётся доступен |
-| `nearest_reportable_intrusion_distance_from_source_origin_m` | Расстояние до ближайшей reportable точки от начала координат исходного облака, не от носа поезда |
-| `system_status=UNKNOWN`, `safety_decision_permitted=false` | Геометрия assumed, разрешение движения не выдаётся; отсутствие кандидата не CLEAR |
-
-Калибровка монтажа, физический динамический габарит и качество на независимых положительных проездах не подтверждены. Положительный интервал разработки — `doubleT_obstacle` **13–64 включительно**, один известный объект; 52 кадра не являются 52 независимыми событиями. Frame metrics, event metrics и UNKNOWN coverage учитываются отдельно.
-
-В текущий запуск не входят CUDA, arc-варианты, deskew, карта, tracking и TTC. `arc_limited` остаётся явным экспериментальным player-режимом; `arc_clamped` доступен только в низкоуровневых C++/ROS2 экспериментах. Их наличие не меняет выбранный `tangent`. Качество и скорость оцениваются раздельно; [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) указывает версию и область замера. Прямой транспорт не исключает ожидание чтения архива, lock или C++ обработки.
-
-Это хакатонный прототип, не сертифицированная система управления торможением. Для финальной сдачи нужно проверять именно текущую версию `baseline_v3` runtime: чистую сборку, direct/ROS2 parity, длинный replay, задержки/очереди/drops и ресурсы. История работ и текущий статус: [development history](docs/DEVELOPMENT_HISTORY_AND_STATUS.md).
-
-## Среда разработки
-
-- Dockerfile использует `ros:humble-ros-base-jammy`; системные Python/ROS-зависимости устанавливаются APT, C++ пакет собирается colcon.
-- [`.python-version`](.python-version) содержит `3.10`. Локальная Windows `.venv` — отдельная среда; на этой машине её конфигурация указывает Python 3.12.10. Смена локального Python не требуется для запуска контейнера.
-- [`requirements.txt`](requirements.txt) перечисляет NumPy и Matplotlib; ROS2/rclpy/messages поставляются образом, а исследовательские scripts могут требовать дополнительные системные или локальные зависимости. Этот файл не является полным установщиком ROS-окружения.
-- CPU — основной путь. GPU/CUDA не входит в маршрут для сдачи и не требуется для проверки Docker/ROS2 demo.
+- Выход: кандидат препятствия, ближайшее расстояние от начала координат исходного облака, статус и diagnostics.
+- `UNKNOWN` и отсутствие кандидата **не означают свободный путь**. Решение не выдаёт разрешение движения.
+- Монтаж лидара, физический габарит и качество на независимых положительных проездах не подтверждены. `80 м` — граница поиска, а не измеренная дальность обнаружения.
+- Это хакатонный прототип, не сертифицированная система управления поездом. [Текущие проверки и пробелы](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) приведены отдельно.
 
 ## Документация
 
-- [Описание решения для сдачи](SOLUTION.md) — архитектура, алгоритм, проверки и ограничения.
-- [Быстрый запуск для проверяющих](docs/REVIEWER_QUICKSTART.md) — короткий маршрут подготовки данных, player и ROS2 smoke.
-- [Чеклист сдачи и repo-gate](docs/SUBMISSION_CHECKLIST.md) — состав публичной передачи и обязательные проверки.
-- [Срез готовности к критериям](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) — evidence/gap report по требованиям.
-- [Проверка headless ROS2 запуска](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md) — журнал smoke-проверки ROS2 demo.
-- [Подготовка локальных файлов плеера](docs/PLAYER_SETUP.md) — viewer-assets, XML и локальные предпосылки запуска.
-- [Методология и действующий контракт](docs/METHODOLOGY.md) — метод, safety-инварианты и границы runtime.
-- [История работ и текущий статус](docs/DEVELOPMENT_HISTORY_AND_STATUS.md) — этапы, подтверждённые проверки и очередь.
-- [Датасеты, наблюдения и ограничения](docs/DATASETS_AND_ASSUMPTIONS.md) — реестр входов, выборок и допущений.
-- [Габарит и необходимые калибровки](docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md) — геометрия envelope и непроверенные калибровки.
-- [Паспорт лидара](docs/LIDAR_SPEC.md) — характеристики сенсора и ограничения входных данных.
+- [SOLUTION.md](SOLUTION.md) — архитектура, алгоритм, результат и ограничения.
+- [REVIEWER_QUICKSTART.md](docs/REVIEWER_QUICKSTART.md) — подготовка данных, ручной запуск, API и ROS2 demo.
+- [METHODOLOGY.md](docs/METHODOLOGY.md) — метод и контракты `baseline_v3`.
+- [SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) — состав и проверки перед сдачей.
 
-Основной маршрут чтения для проверяющего: `README.md`, `SOLUTION.md`,
-`docs/REVIEWER_QUICKSTART.md` и `docs/SUBMISSION_CHECKLIST.md`.
-
-## Структура репозитория
-
-```text
-src/                                   C++ ядро, ROS2 пакет и Python readers для плеера.
-scripts/                               Подготовка данных, запуск плеера, ROS2 demo и package gate.
-config/                                Контракты, параметры и development-аннотации.
-models/                                Версионированная JSON-модель; runtime использует C++ реализацию.
-web/                                   Статические файлы HTTP-плеера.
-tests/                                 Regression-тесты контрактов, плеера и repo-gate.
-assets/                                Изображения README/SOLUTION и схемы решения.
-dataset/                               Локальные архивы/распаковки, ignored.
-artefacts/                             Локальные результаты и assets, ignored.
-docs/                                  Основная документация, методология и отчёты.
-  REVIEWER_QUICKSTART.md               Короткий сценарий запуска для проверяющего.
-  SUBMISSION_CHECKLIST.md              Чеклист состава репозитория, данных, demo и stop-code.
-  PLAYER_SETUP.md                      Однократная подготовка viewer-assets и локального окружения плеера.
-  METHODOLOGY.md                       Метод, контракты, ограничения и будущие расширения pipeline.
-  DEVELOPMENT_HISTORY_AND_STATUS.md    История этапов, текущий статус и границы подтверждений.
-  DATASETS_AND_ASSUMPTIONS.md          Реестр датасетов, наблюдений, выборок и открытых вопросов.
-  TRAIN_ENVELOPE_AND_LIMITATIONS.md    Габарит поезда, допущения и необходимые калибровки.
-  LIDAR_SPEC.md                        Паспорт лидара и входные характеристики.
-  reports/submission/                  Evidence/gap отчёты по проверкам перед передачей.
-  hackathon_documentations/instruction.md  Условия и поля сдачи из материалов хакатона.
-```
-
-## Лицензия
-
-[MIT](LICENSE).
+Лицензия: [MIT](LICENSE).

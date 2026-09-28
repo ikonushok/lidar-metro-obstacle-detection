@@ -1,6 +1,6 @@
 # Подготовка прямого CPU-плеера
 
-Статус: актуальные предусловия `development_candidate / tangent / model_v1`, 2026-09-23. [Основной запуск и headless ROS2](../README.md). Эта страница описывает существующие требования launcher, не меняет код и не включает работы по его автоматизации.
+Ручная подготовка для `run_stage_2_cpu_player.ps1`. Основной запуск через [Docker Compose](../README.md#плеер-с-архивами-организаторов) сам готовит viewer-файлы в образе и не требует шагов ниже.
 
 ## Данные
 
@@ -56,7 +56,7 @@ if (-not (Test-Path -LiteralPath $profile)) {
 Get-Item -LiteralPath $profile, (Join-Path $vendorDir 'three.min.js'), (Join-Path $vendorDir 'OrbitControls.js')
 ```
 
-После этого выполните [команду плеера](../README.md#c-cpu-player-прямой-запуск-алгоритма). Для headless ROS2 эти локальные viewer-файлы не нужны; его SHM-профиль находится внутри образа и не заменяется этим UDP XML.
+После этого выполните [ручную команду плеера](REVIEWER_QUICKSTART.md#4-запустить-docker-плеер). Для headless ROS2 эти локальные viewer-файлы не нужны; его SHM-профиль находится внутри образа и не заменяется этим UDP XML.
 
 ## Проверки и ограничения
 
