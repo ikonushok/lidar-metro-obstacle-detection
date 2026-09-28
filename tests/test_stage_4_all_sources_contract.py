@@ -91,6 +91,13 @@ class AllSourcesViewerContractTests(unittest.TestCase):
         self.assertIn("value.pop('outside_reference_source_indices', None)", server)
         self.assertIn("'result': viewer_result(result)", server)
 
+    def test_server_exposes_only_source_scoped_frame_api(self):
+        server = (ROOT / 'scripts/serve_stage_2_cpu_catalog.py').read_text(encoding='utf-8')
+        self.assertIn('/datasets.json', server)
+        self.assertIn('/api/cpu_sources/{source_id}/manifest.json', server)
+        self.assertNotIn('/api/cpu_new_data', server)
+        self.assertNotIn("path == '/manifest.json'", server)
+
 
 if __name__ == '__main__':
     unittest.main()

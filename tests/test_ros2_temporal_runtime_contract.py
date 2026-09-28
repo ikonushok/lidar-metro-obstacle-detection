@@ -5,6 +5,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 NODE = ROOT / "src/lidar_mosmetro3d_cpp/src/curve_envelope_node.cpp"
+STREAM_CLI = ROOT / "src/cpp/curve_pipeline_stream_cli.cpp"
 CHECKER = ROOT / "scripts/check_ros_model_pipeline.py"
 WRAPPER = ROOT / "scripts/run_submission_ros2_demo.ps1"
 
@@ -26,6 +27,8 @@ class Ros2TemporalRuntimeContractTest(unittest.TestCase):
         )
         self.assertIn("model_frame_intrusion_candidate_present", source)
         self.assertIn("model_temporal_confirmed_intrusion_candidate_present", source)
+        self.assertIn("baseline_v3_early_temporal_confirmed_intrusion_candidate_present", source)
+        self.assertIn("kBaselineV3EarlyRequiredConsecutiveFrames = 3", source)
 
         apply_pos = source.index("const auto temporal_decision = ApplyTemporalConfirmation")
         public_pos = source.index('<< "\\"intrusion_candidate_present\\":"')
@@ -34,6 +37,15 @@ class Ros2TemporalRuntimeContractTest(unittest.TestCase):
             "temporal_decision.confirmed_intrusion_candidate_present",
             source[apply_pos:public_pos],
         )
+
+    def test_direct_stream_promotes_three_frame_early_candidate_to_public_alarm(self):
+        source = STREAM_CLI.read_text(encoding="utf-8")
+
+        self.assertIn("kBaselineV3EarlyRequiredConsecutiveFrames = 3", source)
+        self.assertIn("baseline_v3_early_temporal_intrusion", source)
+        self.assertIn("baseline_v3_early_temporal_confirmed_intrusion_candidate_present", source)
+        self.assertIn("result.nearest_baseline_v3_early_candidate", source)
+        self.assertIn("public_reportable_core_source_indices", source)
 
     def test_ros2_checker_no_longer_requires_direct_public_alarm_parity(self):
         tree = ast.parse(CHECKER.read_text(encoding="utf-8"))
@@ -64,7 +76,7 @@ class Ros2TemporalRuntimeContractTest(unittest.TestCase):
         self.assertIn("[string]$InputTopic = '/sensing/lidar/hesai128/pointcloud'", source)
         self.assertIn("[string]$SourceFrame = 'lidar_livox'", source)
         self.assertIn("metadata.yaml", source)
-        self.assertIn("BagPath must point to an extracted ROS2 bag directory", source)
+        self.assertIn("-RecordingPath must point to an extracted ROS2 recording folder", source)
         self.assertIn("-p input_topic:=$InputTopic", source)
         self.assertIn("-p source_frame:=$SourceFrame", source)
         self.assertIn("-p output_topic:=$OutputTopic", source)

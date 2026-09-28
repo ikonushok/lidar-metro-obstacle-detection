@@ -45,23 +45,6 @@ function axisDistanceLabels(pairs){
   const endPair=endDistancePair(pairs);
   if(endPair&&endPair!==envelopeEndPair&&!labelled.has(endPair))axisLabel(`${endPair.source_s_m.toFixed(1)} м`,sideAxisLabelPosition(endPair,1.0,.7));
 }
-let envelopeEndLabelPosition=null,envelopeEndLabelCenter=null;
-function positionEnvelopeEndLabel(){
-  const label=typeof $==='function'?$('envelope-end-axis-label'):null;
-  if(envelopeEndLabelPosition&&label){
-    const point=new THREE.Vector3().fromArray(envelopeEndLabelPosition).project(camera);
-    const visible=point.z>=-1&&point.z<=1&&Math.abs(point.x)<=1&&Math.abs(point.y)<=1;
-    label.hidden=!visible;
-    if(visible){
-      const center=new THREE.Vector3().fromArray(envelopeEndLabelCenter).project(camera);
-      label.style.left=`${(point.x+1)*$('scene').clientWidth/2}px`;
-      label.style.top=`${(1-point.y)*$('scene').clientHeight/2}px`;
-      label.style.transform=point.x<center.x?'translate(-100%,-50%)':'translate(0,-50%)';
-    }
-  }
-  if(typeof requestAnimationFrame==='function')requestAnimationFrame(positionEnvelopeEndLabel);
-}
-positionEnvelopeEndLabel();
 function envelopeEndDescription(pairs){
   const end=Number(pairs.at(-1)?.source_s_m);
   if(!pairs.length||!Number.isFinite(end))return '';
@@ -82,17 +65,6 @@ render=function(){
   endBadge.textContent=$('core-envelope-layer').checked&&result?.core_envelope_wireframe_source_xyz?.length?
     envelopeEndDescription(pairs):'';
   endBadge.hidden=!endBadge.textContent;
-  let endLabel=$('envelope-end-axis-label');
-  if(!endLabel){
-    endLabel=document.createElement('div');
-    endLabel.id='envelope-end-axis-label';
-    $('scene').appendChild(endLabel);
-  }
-  const endPair=$('axis-layer').checked?pairs.at(-1):null;
-  envelopeEndLabelPosition=endPair?sideAxisLabelPosition(endPair,1.4,.9):null;
-  envelopeEndLabelCenter=endPair?endPair.left_xyz.map((value,index)=>(value+endPair.right_xyz[index])*.5):null;
-  endLabel.textContent=endPair?`${endPair.source_s_m.toFixed(1)} м · конец габарита`:'';
-  endLabel.hidden=!endPair;
   if(!$('axis-layer').checked||!pairs.length)return;
   axisDistanceLabels(pairs);
 };

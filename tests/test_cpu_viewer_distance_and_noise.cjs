@@ -126,9 +126,7 @@ test('envelope end label uses the final C++ pair, not the observed rail support'
   assert.equal(labels.filter(({text}) => text.includes('конец габарита')).length, 0);
   elements.get('axis-layer').checked = true;
   context.render();
-  assert.equal(elements.get('envelope-end-axis-label').textContent,
-    '80.0 м · конец габарита');
-  assert.equal(elements.get('envelope-end-axis-label').hidden, false);
+  assert.equal(elements.has('envelope-end-axis-label'), false);
 
   elements.get('core-envelope-layer').checked = false;
   context.render();

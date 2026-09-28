@@ -71,25 +71,6 @@ def load_review_source_statuses(root: Path):
     return {item['source_id']: item.get('label_status') for item in document['sources']}
 
 
-def load_local_review_alarm_frames(root: Path, frame_count: int, mode: str):
-    """Optional ignored replay evidence; never an input to the detector."""
-    path = root / 'docs/stages/fake_object_frame_review.json'
-    if not path.exists():
-        return []
-    try:
-        report = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        return []
-    if (report.get('format') != 'fake_object_frame_review_v1'
-            or report.get('dataset') != 'cloud_with_fake_obj'
-            or report.get('mode') != mode
-            or report.get('frame_count') != frame_count):
-        return []
-    return [frame['index'] for frame in report.get('frames', [])
-            if frame.get('alarm') is True and isinstance(frame.get('index'), int)
-            and 0 <= frame['index'] < frame_count]
-
-
 def serve(root: Path, port: int, rail_selection_method: str, rail_forward_min_m: float,
           forward_extension_method: str, arc_extension_horizon_m: float,
           min_arc_radius_m: float, max_arc_turn_deg: float, arc_fit_window_pairs: int,
@@ -111,9 +92,6 @@ def serve(root: Path, port: int, rail_selection_method: str, rail_forward_min_m:
     obstacle_annotations = load_obstacle_annotations(root)
     review_objects = load_review_objects(root)
     review_source_statuses = load_review_source_statuses(root)
-    review_alarm_frames = load_local_review_alarm_frames(
-        root, len(sources['cloud_with_fake_obj'].lookup),
-        f'{rail_selection_method}/fmin{rail_forward_min_m:g}/{forward_extension_method}/{noise_filter_mode}')
     latest_frame_tokens = {}
     state_lock = threading.Lock()
     data_lock = threading.Lock()
@@ -133,8 +111,6 @@ def serve(root: Path, port: int, rail_selection_method: str, rail_forward_min_m:
             'playback_timing': 'SOURCE_BAG_TIMING_PLUS_LAZY_CPU_PROCESSING',
             'review_objects': review_objects if source_id == 'cloud_with_fake_obj' else [],
             'review_label_status': review_source_statuses.get(source_id),
-            'review_alarm_frames': review_alarm_frames if source_id == 'cloud_with_fake_obj' else [],
-            'review_alarm_frames_source': 'ignored_offline_replay' if review_alarm_frames else None,
             'review_labels_are_detector_input': False,
             'frames': [{'index': index, 'source_index': index,
                         'metadata_url': f'/api/cpu_sources/{source_id}/{index}.json'}
@@ -184,8 +160,6 @@ def serve(root: Path, port: int, rail_selection_method: str, rail_forward_min_m:
                     return self.send_json([{'id': source_id, 'label': label,
                                             'manifest': f'/api/cpu_sources/{source_id}/manifest.json'}
                                            for source_id, label, _prefix, _archive in SOURCES])
-                if path == '/manifest.json':
-                    return self.send_json(manifest('new_data'))
                 match = re.fullmatch(r'/api/cpu_sources/([A-Za-z0-9_-]+)/(manifest\.json|(\d+)\.(json|xyzf))', path)
                 if match:
                     source_id, suffix = match[1], match[2]
@@ -204,17 +178,6 @@ def serve(root: Path, port: int, rail_selection_method: str, rail_forward_min_m:
                     return self.send_json({'frame': record, 'result': viewer_result(result),
                                            'review_annotations': review_annotations,
                                            'review_annotations_are_detector_input': False})
-                # Saved new_data links remain usable.
-                match = re.fullmatch(r'/api/cpu_new_data/(\d+)\.(json|xyzf)', path)
-                if match:
-                    index, kind = int(match[1]), match[2]
-                    token = mark_latest_frame_request('new_data', index)
-                    record, xyz, result = frame_result('new_data', index, token)
-                    if kind == 'xyzf':
-                        return self.send_bytes(xyz)
-                    record = dict(record)
-                    record['file'] = f'/api/cpu_new_data/{index}.xyzf'
-                    return self.send_json({'frame': record, 'result': viewer_result(result)})
                 if path in ('/', '/index.html'):
                     html = (root / 'web/stage_4_cpu_viewer.html').read_text(encoding='utf-8').replace(
                         '<script src="stage_4_cpu_player.js"></script>',

@@ -82,15 +82,17 @@ cloud_with_fake_obj              # synthetic/fake obstacles от организ�
 development/evaluation-данные и не являются отдельным source в браузерном
 catalog.
 
-Оранжевая надпись «Возможное препятствие» — экспериментальный сигнал: C++ видит
-подходящую по форме группу точек внутри габарита, а плеер показывает её после
-трёх кадров подряд с кандидатом. Это не подтверждённая тревога; `status` может
-оставаться `UNKNOWN`. Плеер не проверяет, что во всех трёх кадрах это один объект.
-Красная надпись «Препятствие» и красные точки означают
-`intrusion_candidate_present=true` в основном C++ детекторе. Это также не
-доказательство физического препятствия: 47 красных кадров `new_data` считаются
-FP по сообщению пользователя об отсутствии препятствий. На этом источнике
-плеер подписывает красную тревогу как «Ложная тревога».
+Надпись «Препятствие» / «Возможное препятствие» показывает public C++ detection.
+В режиме `baseline_v3` трёхкадровый ранний кандидат поднимается в
+`intrusion_candidate_present=true`, поэтому headless JSON, evaluator и плеер
+используют один и тот же ранний результат. Максимальное задетектированное
+расстояние в доступных пользовательских positive-окнах `cloud_with_fake_obj` —
+`68.069 м` от source LiDAR origin (`obj01_2x2_center`, кадр `137`). На кадре
+`142` расстояние равно `65.708 м`.
+
+Это решение алгоритма, а не доказательство физического препятствия: 47 красных
+кадров `new_data` считаются FP по сообщению пользователя об отсутствии
+препятствий. На этом источнике плеер подписывает тревогу как «Ложная тревога».
 
 ## 5. Быстрая проверка API
 
@@ -156,6 +158,15 @@ python .\scripts\measure_headless_ros2_cpp_performance.py `
 Скрипт сам запускает `ros2 bag play /data`, слушает JSON-выход detector node,
 считает p50/p95/p99/max по `processing_ms`, снимает `docker stats` и пишет
 артефакты в `artefacts/current_model_validation/`.
+
+Для пересчёта расстояния до первого public detection на доступных positive-окнах
+используйте тот же Docker image:
+
+```powershell
+docker run --rm --mount "type=bind,source=$PWD,target=/workspace" `
+  lidar-metro-obstacle-detection:submission `
+  bash -lc "source /opt/ros/humble/setup.bash && source /app/install/setup.bash && python3 /workspace/scripts/measure_detection_distances.py --root /workspace --progress"
+```
 
 ## Ограничения демо
 

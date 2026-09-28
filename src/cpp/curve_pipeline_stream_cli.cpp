@@ -16,6 +16,8 @@
 
 namespace {
 
+constexpr int kBaselineV3EarlyRequiredConsecutiveFrames = 3;
+
 void AppendWireframeJson(
     std::ostringstream& json,
     const std::vector<lidar_mosmetro3d::LineSegment3f>& wireframe) {
@@ -229,6 +231,8 @@ int main(int argc, char** argv) {
         : active_model_filter ? "baseline_v3_assist_score" : "legacy";
     bool previous_baseline_v3_model_alarm = false;
     int baseline_v3_model_consecutive_alarm_frames = 0;
+    bool previous_baseline_v3_early_alarm = false;
+    int baseline_v3_early_consecutive_alarm_frames = 0;
     const std::string requested_forward_extension_method = observed_only ? "observed_only"
         : arc_limited ? "arc_limited" : arc_clamped ? "arc_clamped" : "tangent";
     while (true) {
@@ -253,6 +257,8 @@ int main(int argc, char** argv) {
         if (active_baseline_v3_filter) {
           previous_baseline_v3_model_alarm = false;
           baseline_v3_model_consecutive_alarm_frames = 0;
+          previous_baseline_v3_early_alarm = false;
+          baseline_v3_early_consecutive_alarm_frames = 0;
         }
         std::cout << UnknownJson(rails, config, point_count,
                                  requested_forward_extension_method,
@@ -353,6 +359,8 @@ int main(int argc, char** argv) {
           active_baseline_v3_filter && result.baseline_v3_geometry_obstacle_count > 0;
       const bool baseline_v3_model_frame_intrusion =
           active_baseline_v3_filter && result.baseline_v3_model_assist_count > 0;
+      const bool baseline_v3_early_frame_intrusion =
+          active_baseline_v3_filter && result.baseline_v3_early_candidate_count > 0;
       if (active_baseline_v3_filter) {
         if (baseline_v3_model_frame_intrusion && previous_baseline_v3_model_alarm) {
           ++baseline_v3_model_consecutive_alarm_frames;
@@ -360,12 +368,42 @@ int main(int argc, char** argv) {
           baseline_v3_model_consecutive_alarm_frames = baseline_v3_model_frame_intrusion ? 1 : 0;
         }
         previous_baseline_v3_model_alarm = baseline_v3_model_frame_intrusion;
+        if (baseline_v3_early_frame_intrusion && previous_baseline_v3_early_alarm) {
+          ++baseline_v3_early_consecutive_alarm_frames;
+        } else {
+          baseline_v3_early_consecutive_alarm_frames = baseline_v3_early_frame_intrusion ? 1 : 0;
+        }
+        previous_baseline_v3_early_alarm = baseline_v3_early_frame_intrusion;
       }
       const bool baseline_v3_model_temporal_intrusion =
           baseline_v3_model_frame_intrusion && baseline_v3_model_consecutive_alarm_frames >= 2;
+      const bool baseline_v3_early_temporal_intrusion =
+          baseline_v3_early_frame_intrusion &&
+          baseline_v3_early_consecutive_alarm_frames >= kBaselineV3EarlyRequiredConsecutiveFrames;
       const bool intrusion = active_baseline_v3_filter
-          ? (baseline_v3_geometry_intrusion || baseline_v3_model_temporal_intrusion)
+          ? (baseline_v3_geometry_intrusion || baseline_v3_model_temporal_intrusion ||
+             baseline_v3_early_temporal_intrusion)
           : result.reportable_core_count > 0;
+      const bool use_early_public_candidate = active_baseline_v3_filter &&
+          baseline_v3_early_temporal_intrusion && result.reportable_core_source_indices.empty();
+      const auto& public_reportable_core_source_indices = use_early_public_candidate
+          ? result.baseline_v3_early_candidate_source_indices
+          : result.reportable_core_source_indices;
+      const std::size_t public_reportable_core_count = public_reportable_core_source_indices.size();
+      const auto& public_nearest_reportable_core = use_early_public_candidate
+          ? result.nearest_baseline_v3_early_candidate
+          : result.nearest_reportable_core;
+      std::vector<std::size_t> public_ignored_noise_source_indices = result.ignored_noise_source_indices;
+      if (use_early_public_candidate) {
+        public_ignored_noise_source_indices.erase(
+            std::remove_if(public_ignored_noise_source_indices.begin(), public_ignored_noise_source_indices.end(),
+                           [&public_reportable_core_source_indices](std::size_t index) {
+                             return std::find(public_reportable_core_source_indices.begin(),
+                                              public_reportable_core_source_indices.end(),
+                                              index) != public_reportable_core_source_indices.end();
+                           }),
+            public_ignored_noise_source_indices.end());
+      }
       const bool margin = result.margin_count > 0;
       if (lean_benchmark) {
         const bool model_intrusion = model_result.reportable_core_count > 0;
@@ -431,6 +469,7 @@ int main(int argc, char** argv) {
       const char* reason = intrusion && active_baseline_v3_filter ? "BASELINE_V3_CONFIRMED_INTRUSION_CANDIDATE"
                            : intrusion ? "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
                            : active_baseline_v3_filter && baseline_v3_boundary_warning ? "BASELINE_V3_BOUNDARY_WARNING_NOT_OBSTACLE"
+                           : active_baseline_v3_filter && baseline_v3_early_frame_intrusion ? "BASELINE_V3_EARLY_CANDIDATE_WAITING_FOR_TEMPORAL_CONFIRMATION"
                            : active_baseline_v3_filter && baseline_v3_model_frame_intrusion ? "BASELINE_V3_MODEL_ASSIST_WAITING_FOR_TEMPORAL_CONFIRMATION"
                            : active_baseline_v3_filter && raw_core ? "BASELINE_V3_WEAK_OR_UNCONFIRMED_CORE_UNKNOWN_NOT_CLEAR"
                            : raw_core ? "ONLY_SPARSE_CORE_GROUPS"
@@ -472,8 +511,8 @@ int main(int argc, char** argv) {
            << ",\"observed_support_end_source_s_m\":" << rails.rail_pairs.back().source_s_m
            << ",\"envelope_forward_end_source_s_m\":" << active_pairs.back().source_s_m
            << ",\"core_count\":" << result.core_count
-           << ",\"reportable_core_count\":" << result.reportable_core_count
-           << ",\"ignored_noise_count\":" << result.ignored_noise_count
+           << ",\"reportable_core_count\":" << public_reportable_core_count
+           << ",\"ignored_noise_count\":" << public_ignored_noise_source_indices.size()
            << ",\"margin_count\":" << result.margin_count
            << ",\"outside_reference_count\":" << result.outside_reference_count
            << ",\"unknown_count\":" << result.unknown_count
@@ -510,7 +549,13 @@ int main(int argc, char** argv) {
              << ",\"baseline_v3_model_temporal_consecutive_alarm_frames\":"
              << baseline_v3_model_consecutive_alarm_frames
              << ",\"baseline_v3_model_temporal_confirmed_intrusion_candidate_present\":"
-             << (baseline_v3_model_temporal_intrusion ? "true" : "false");
+             << (baseline_v3_model_temporal_intrusion ? "true" : "false")
+             << ",\"baseline_v3_early_temporal_consecutive_alarm_frames\":"
+             << baseline_v3_early_consecutive_alarm_frames
+             << ",\"baseline_v3_early_temporal_required_consecutive_frames\":"
+             << kBaselineV3EarlyRequiredConsecutiveFrames
+             << ",\"baseline_v3_early_temporal_confirmed_intrusion_candidate_present\":"
+             << (baseline_v3_early_temporal_intrusion ? "true" : "false");
         if (profile_model_filter) {
           json << ',';
           AppendModelFilterProfileJson(json, model_filter_profile);
@@ -585,7 +630,7 @@ int main(int argc, char** argv) {
       }
       json << "],\"reportable_core_source_indices\":[";
       bool first_reportable = true;
-      for (const auto index : result.reportable_core_source_indices) {
+      for (const auto index : public_reportable_core_source_indices) {
         if (!first_reportable) json << ',';
         json << index;
         first_reportable = false;
@@ -599,7 +644,7 @@ int main(int argc, char** argv) {
       }
       json << "],\"ignored_noise_source_indices\":[";
       bool first_noise = true;
-      for (const auto index : result.ignored_noise_source_indices) {
+      for (const auto index : public_ignored_noise_source_indices) {
         if (!first_noise) json << ',';
         json << index;
         first_noise = false;
@@ -637,11 +682,11 @@ int main(int argc, char** argv) {
              << ",\"nearest_intrusion_xyz\":[" << xyz[offset] << ',' << xyz[offset + 1] << ','
              << xyz[offset + 2] << ']';
       }
-      if (result.nearest_reportable_core.source_index != std::numeric_limits<std::size_t>::max()) {
-        const auto offset = result.nearest_reportable_core.source_index * 3;
-        json << ",\"nearest_reportable_intrusion_source_index\":" << result.nearest_reportable_core.source_index
+      if (public_nearest_reportable_core.source_index != std::numeric_limits<std::size_t>::max()) {
+        const auto offset = public_nearest_reportable_core.source_index * 3;
+        json << ",\"nearest_reportable_intrusion_source_index\":" << public_nearest_reportable_core.source_index
              << ",\"nearest_reportable_intrusion_distance_from_source_origin_m\":"
-             << result.nearest_reportable_core.distance_from_source_origin_m
+             << public_nearest_reportable_core.distance_from_source_origin_m
              << ",\"nearest_reportable_intrusion_xyz\":[" << xyz[offset] << ',' << xyz[offset + 1] << ','
              << xyz[offset + 2] << ']';
       }

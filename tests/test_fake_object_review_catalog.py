@@ -3,14 +3,13 @@
 import json
 from pathlib import Path
 import sys
-import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from serve_stage_2_cpu_catalog import (  # noqa: E402
-    load_local_review_alarm_frames, load_review_objects, load_review_source_statuses)
+    load_review_objects, load_review_source_statuses)
 
 
 class FakeObjectReviewCatalogTest(unittest.TestCase):
@@ -38,30 +37,6 @@ class FakeObjectReviewCatalogTest(unittest.TestCase):
         self.assertEqual(new_data["label_status"], "user_reported_no_obstacles")
         self.assertEqual(load_review_source_statuses(ROOT)["new_data"],
                          "user_reported_no_obstacles")
-
-    def test_local_replay_markers_require_matching_configuration(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            report = root / "docs/stages/fake_object_frame_review.json"
-            report.parent.mkdir(parents=True)
-            report.write_text(json.dumps({
-                "format": "fake_object_frame_review_v1",
-                "dataset": "cloud_with_fake_obj",
-                "mode": "development_candidate/fmin2/tangent/baseline_v3",
-                "frame_count": 4,
-                "frames": [{"index": 1, "alarm": True}, {"index": 2, "alarm": False},
-                           {"index": 5, "alarm": True}],
-            }), encoding="utf-8")
-            self.assertEqual(load_local_review_alarm_frames(
-                root, 4, "development_candidate/fmin2/tangent/baseline_v3"), [1])
-            self.assertEqual(load_local_review_alarm_frames(root, 5,
-                             "development_candidate/fmin2/tangent/baseline_v3"), [])
-            self.assertEqual(load_local_review_alarm_frames(root, 4,
-                             "development_candidate/fmin2/tangent/legacy"), [])
-            report.write_text("{truncated", encoding="utf-8")
-            self.assertEqual(load_local_review_alarm_frames(
-                root, 4, "development_candidate/fmin2/tangent/baseline_v3"), [])
-
 
 if __name__ == "__main__":
     unittest.main()

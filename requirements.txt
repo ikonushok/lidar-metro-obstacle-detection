@@ -5,6 +5,7 @@ numpy>=1.21.0
 matplotlib>=3.5.0
 scikit-learn>=0.23.2
 lightgbm>=4.5.0
+PyYAML>=6.0
 
 # ROS 2 dependencies are intentionally not listed as pip packages.  They are
 # supplied by ros:humble-ros-base-jammy and APT in Dockerfile:

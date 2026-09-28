@@ -7,27 +7,37 @@ eventDetail.id = 'event-detail';
 let eventReviewDataset = null;
 let selectedUnlocalizedObject = null;
 const alarmFrameMarkers = new Set();
+const earlyFrameMarkers = new Set();
 
-function addAlarmMarker(index, source) {
-  if (!Number.isInteger(index) || alarmFrameMarkers.has(index)) return;
-  alarmFrameMarkers.add(index);
+function addDetectionMarker(index, kind, source) {
+  const frames = kind === 'early' ? earlyFrameMarkers : alarmFrameMarkers;
+  if (!Number.isInteger(index) || frames.has(index)) return;
+  frames.add(index);
   const marker = document.createElement('button');
   marker.type = 'button';
-  marker.className = 'observed-alarm';
+  marker.className = kind === 'early' ? 'early-detection' : 'confirmed-detection';
   marker.style.left = `${100 * index / Math.max(1, manifest.frames.length - 1)}%`;
-  marker.title = `C++: тревога, кадр ${index} (${source})`;
+  marker.title = kind === 'early' ?
+    `Возможное препятствие: кадр ${index} (${source})` :
+    `C++: тревога, кадр ${index} (${source})`;
   marker.setAttribute('aria-label', marker.title);
   marker.onclick = () => showNow(index);
   eventTrack.appendChild(marker);
 }
 
+function addAlarmMarker(index, source) {
+  addDetectionMarker(index, 'confirmed', source);
+}
+
 function updateEventReview() {
   const objects = manifest?.review_objects || [];
   eventReview.hidden = objects.length === 0;
+  document.getElementById('event-track-legend').hidden = objects.length === 0;
   if (eventReviewDataset !== manifest?.dataset_id) {
     eventReviewDataset = manifest?.dataset_id;
     selectedUnlocalizedObject = null;
     alarmFrameMarkers.clear();
+    earlyFrameMarkers.clear();
     eventReview.replaceChildren(eventDetail);
     eventTrack.replaceChildren();
     for (const item of objects) {
@@ -37,9 +47,6 @@ function updateEventReview() {
       button.textContent = item.object_id.slice(3);
       button.dataset.objectId = item.object_id;
       button.className = window ? '' : 'unlocalized';
-      if (item.working_role !== 'positive' && item.working_role !== 'positive_review') {
-        button.classList.add('negative');
-      }
       const reviewNote = item.review_status === 'ambiguous_excluded' ?
         'объект не подтверждён; исключён из анализа' :
         'не локализован; исключён из анализа';
@@ -57,21 +64,21 @@ function updateEventReview() {
       if (window) {
         const marker = document.createElement('button');
         marker.type = 'button';
-        marker.className = button.className;
+        marker.className = 'user-window';
         marker.style.left = `${100 * window[0] / Math.max(1, manifest.frames.length - 1)}%`;
-        marker.title = button.title;
+        marker.style.width = `${100 * (window[1] - window[0] + 1) / manifest.frames.length}%`;
+        marker.title = `Ваша разметка: ${button.title}`;
         marker.setAttribute('aria-label', button.getAttribute('aria-label'));
         marker.onclick = () => showNow(window[0]);
         eventTrack.appendChild(marker);
       }
     }
-    for (const index of manifest.review_alarm_frames || []) {
-      addAlarmMarker(index, 'локальный полный прогон');
-    }
   }
 
   if (result?.intrusion_candidate_present === true && current >= 0) {
-    addAlarmMarker(current, 'текущий просмотр');
+    addAlarmMarker(current, 'просмотренный кадр');
+  } else if (result?.noise_filter_mode === 'baseline_v3' && current >= 0 && earlyRunPresent()) {
+    addDetectionMarker(current, 'early', 'просмотренный кадр');
   }
 
   const active = objects.find(item => item.frames_inclusive &&

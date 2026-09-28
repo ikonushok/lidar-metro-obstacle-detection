@@ -14,10 +14,12 @@
 - `artefacts/current_model_validation/direct_player_http_timing_new_data_1050_1150.json` — direct HTTP/compute timing на интервале `new_data`.
 - `artefacts/current_model_validation/ros2_parity_timing.json` — parity/timing direct и ROS2 на одном входе.
 - `artefacts/current_model_validation/headless_ros2_cpp_performance_rate_1p0_summary_diagnostics_summary.json` — headless ROS2/C++ timing без плеера на `doubleT_obstacle` в compact diagnostics.
+- `artefacts/current_model_validation/detection_distance_summary.json` — first warning / first public detection distance по `doubleT_obstacle` и `cloud_with_fake_obj` positive windows.
 - `artefacts/stage_5/direct_player/parity.json` — дополнительный артефакт сверки direct player.
 - `models/baseline_v3_runtime_policy.json` — версия передаваемой runtime-policy.
 - `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md` — журнал headless ROS2 smoke-проверки.
 - `docs/reports/submission/HEADLESS_ROS2_CPP_PERFORMANCE.md` — журнал headless ROS2/C++ performance-проверки.
+- `docs/reports/submission/DETECTION_DISTANCE_REPORT.md` — журнал измерения расстояний обнаружения на доступных positive windows.
 
 ## Текущий подтверждённый срез
 
@@ -35,13 +37,14 @@ geometry-first gate, boundary/warning и temporal model-assist; слабый sco
 | Direct HTTP timing | wall p95 `133.16` ms, p99 `1932.03` ms |
 | ROS2 parity/timing | `PASS`, `201` cases, wall `137.557` s |
 | Headless ROS2 C++ timing without player | compact diagnostics: `187/201` JSON, processing p95 `71.78` ms, `Message queue starved` |
+| Detection distance on positive windows | `doubleT_obstacle`: first public detection `55.580` m; `cloud_with_fake_obj` user-visible windows: first public detection from f137 / `68.069` m |
 
 ## Разрывы к критериям
 
 | Критерий | Статус | Что нужно доделать |
 |---|---|---|
 | 8.1 Работоспособность | частично | Разобрать 50 `FP alarm` и один initial FN текущего `baseline_v3`. |
-| 8.2 Дальность | не закрыт | Измерить first/stable detection distance по `cloud_with_fake_obj` и доступным positive windows; `80 м` оставить только параметром envelope. |
+| 8.2 Дальность | закрыт для доступных positive windows; не production-distance | Измерено по `doubleT_obstacle` и пользовательским visible windows `cloud_with_fake_obj`: first public detection `55.580` м на real development interval; на fake-object окнах first public detection начинается с f137 / `68.069` м. `80 м` остаётся только параметром envelope, расстояние считается от source origin, не от носа поезда. |
 | 8.3 Скорость | частично, detector compute закрыт на development bag; full replay не закрыт | Headless ROS2/C++ замер без плеера в compact diagnostics показал p95 `71.78` ms и max `74.96` ms, то есть detector compute укладывается в ориентир `100` ms для `10 Hz`. Но локальный replay дал `187/201` JSON и `Message queue starved`; следующий шаг — повторить на целевом Linux/Humble стенде. |
 | 8.4 Обобщаемость | не доказана | Зафиксировать held-out split и не донастраивать по test; `doubleT_obstacle` считать development-positive, synthetic — screening evidence. |
 | 8.6 Запуск | средне | Использовать `scripts/run_submission_ros2_demo.ps1` как единую точку старта headless ROS2 demo. |
@@ -74,8 +77,6 @@ Production-долг вроде полной калибровки монтажа,
 | P0 | Чистый пакет сдачи | Описать обязательный gate и исключённые локальные данные/артефакты. | Запуск `scripts/check_submission_package.py --require-clean` на финальном commit. |
 | P1 | Воспроизводимый запуск | Указать `scripts/run_submission_ros2_demo.ps1` как основной headless route и оставить player как демонстрационный путь. | Чистая сборка и replay на финальном commit, если нужно обновить evidence. |
 | P1 | Работоспособность `baseline_v3` | Честно зафиксировать текущие `TP/FN/FP/UNKNOWN` и смысл FP/FN. | Разбор 50 `FP alarm` и initial FN требует анализа результатов/данных. |
-| P1 | Дальность | Запретить claim, что `80 м` — измеренная дальность; описать его только как параметр envelope. | Измерение first/stable detection distance по positive windows. |
-| P1 | Скорость | Зафиксировать compact diagnostics performance-run: detector compute p95 `71.78` ms. | Изолировать причину недобора output/backpressure и повторить на целевом Linux/Humble стенде. |
 | P1 | Обобщаемость | Зафиксировать split-интерпретацию: `doubleT_obstacle` — development-positive, `cloud_with_fake_obj` — screening/working event windows, synthetic — не скрытый test. | Новый независимый held-out test или переразметка требуют отдельной работы. |
 | P2 | Презентация и demo evidence | Сослаться на готовые PPTX/кадры/видео и ограничения. | Новый скринкаст полного запуска требует отдельной записи. |
 

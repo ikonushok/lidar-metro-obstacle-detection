@@ -7,6 +7,7 @@
 #include <sensor_msgs/msg/point_field.hpp>
 #include <std_msgs/msg/string.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <cstdint>
@@ -21,6 +22,8 @@
 #include <vector>
 
 namespace {
+
+constexpr int kBaselineV3EarlyRequiredConsecutiveFrames = 3;
 
 class CurveEnvelopeNode final : public rclcpp::Node {
  public:
@@ -163,6 +166,12 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     temporal_last_stamp_ns_.clear();
     temporal_last_confirmed_alarm_ = false;
     temporal_last_status_ = "RESET";
+    has_early_temporal_state_ = false;
+    early_temporal_previous_frame_alarm_ = false;
+    early_temporal_consecutive_alarm_frames_ = 0;
+    early_temporal_last_stamp_ns_.clear();
+    early_temporal_last_confirmed_alarm_ = false;
+    early_temporal_last_status_ = "RESET";
   }
 
   TemporalDecision ApplyTemporalConfirmation(
@@ -207,6 +216,46 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     decision.confirmed_intrusion_candidate_present = confirmed;
     decision.consecutive_alarm_frames = temporal_consecutive_alarm_frames_;
     decision.status = temporal_last_status_;
+    return decision;
+  }
+
+  TemporalDecision ApplyEarlyTemporalConfirmation(
+      bool frame_intrusion_candidate_present,
+      const std::string& header_timestamp_ns) {
+    TemporalDecision decision;
+    decision.frame_intrusion_candidate_present = frame_intrusion_candidate_present;
+    const bool active = noise_filter_mode_ == "baseline_v3" && temporal_confirmation_enabled_;
+    if (!active) {
+      decision.confirmed_intrusion_candidate_present = false;
+      decision.consecutive_alarm_frames = frame_intrusion_candidate_present ? 1 : 0;
+      decision.status = "NOT_APPLIED";
+      return decision;
+    }
+    if (has_early_temporal_state_ && header_timestamp_ns == early_temporal_last_stamp_ns_) {
+      decision.confirmed_intrusion_candidate_present = early_temporal_last_confirmed_alarm_;
+      decision.consecutive_alarm_frames = early_temporal_consecutive_alarm_frames_;
+      decision.status = early_temporal_last_status_;
+      return decision;
+    }
+    if (frame_intrusion_candidate_present) {
+      early_temporal_consecutive_alarm_frames_ = early_temporal_previous_frame_alarm_
+          ? early_temporal_consecutive_alarm_frames_ + 1
+          : 1;
+    } else {
+      early_temporal_consecutive_alarm_frames_ = 0;
+    }
+    const bool confirmed = frame_intrusion_candidate_present &&
+        early_temporal_consecutive_alarm_frames_ >= kBaselineV3EarlyRequiredConsecutiveFrames;
+    early_temporal_previous_frame_alarm_ = frame_intrusion_candidate_present;
+    has_early_temporal_state_ = true;
+    early_temporal_last_stamp_ns_ = header_timestamp_ns;
+    early_temporal_last_confirmed_alarm_ = confirmed;
+    early_temporal_last_status_ = confirmed ? "APPLIED_CONFIRMED"
+        : frame_intrusion_candidate_present ? "APPLIED_WAITING_FOR_CONSECUTIVE_FRAME"
+        : "APPLIED_NO_CURRENT_EARLY_ALARM";
+    decision.confirmed_intrusion_candidate_present = confirmed;
+    decision.consecutive_alarm_frames = early_temporal_consecutive_alarm_frames_;
+    decision.status = early_temporal_last_status_;
     return decision;
   }
 
@@ -407,6 +456,8 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         baseline_v3_mode && result.baseline_v3_geometry_obstacle_count > 0;
     const bool baseline_v3_model_frame_intrusion =
         baseline_v3_mode && result.baseline_v3_model_assist_count > 0;
+    const bool baseline_v3_early_frame_intrusion =
+        baseline_v3_mode && result.baseline_v3_early_candidate_count > 0;
     const bool baseline_v3_boundary_warning =
         baseline_v3_mode && result.baseline_v3_boundary_warning_count > 0;
     const bool frame_intrusion_candidate_present = baseline_v3_mode
@@ -415,12 +466,37 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     const auto header_timestamp_ns = HeaderTimestampNs(cloud);
     const auto temporal_decision = ApplyTemporalConfirmation(
         frame_intrusion_candidate_present, header_timestamp_ns);
+    const auto early_temporal_decision = ApplyEarlyTemporalConfirmation(
+        baseline_v3_early_frame_intrusion, header_timestamp_ns);
     const bool intrusion_candidate_present = baseline_v3_mode
         ? (baseline_v3_geometry_intrusion ||
-           temporal_decision.confirmed_intrusion_candidate_present)
+           temporal_decision.confirmed_intrusion_candidate_present ||
+           early_temporal_decision.confirmed_intrusion_candidate_present)
         : temporal_decision.confirmed_intrusion_candidate_present;
     const bool model_temporal_confirmed_intrusion_candidate_present =
         temporal_decision.confirmed_intrusion_candidate_present;
+    const bool baseline_v3_early_temporal_intrusion =
+        early_temporal_decision.confirmed_intrusion_candidate_present;
+    const bool use_early_public_candidate = baseline_v3_mode &&
+        baseline_v3_early_temporal_intrusion && result.reportable_core_source_indices.empty();
+    const auto& public_reportable_core_source_indices = use_early_public_candidate
+        ? result.baseline_v3_early_candidate_source_indices
+        : result.reportable_core_source_indices;
+    const std::size_t public_reportable_core_count = public_reportable_core_source_indices.size();
+    const auto& public_nearest_reportable_core = use_early_public_candidate
+        ? result.nearest_baseline_v3_early_candidate
+        : result.nearest_reportable_core;
+    std::vector<std::size_t> public_ignored_noise_source_indices = result.ignored_noise_source_indices;
+    if (use_early_public_candidate) {
+      public_ignored_noise_source_indices.erase(
+          std::remove_if(public_ignored_noise_source_indices.begin(), public_ignored_noise_source_indices.end(),
+                         [&public_reportable_core_source_indices](std::size_t index) {
+                           return std::find(public_reportable_core_source_indices.begin(),
+                                            public_reportable_core_source_indices.end(),
+                                            index) != public_reportable_core_source_indices.end();
+                         }),
+          public_ignored_noise_source_indices.end());
+    }
     const bool margin_return_present = result.margin_count > 0;
     const char* status = intrusion_candidate_present ? "OBSERVED_CORE_INTRUSION_CANDIDATE"
                          : baseline_v3_boundary_warning ? "OBSERVED_BOUNDARY_WARNING"
@@ -431,6 +507,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     const char* reason = intrusion_candidate_present && baseline_v3_mode ? "BASELINE_V3_CONFIRMED_INTRUSION_CANDIDATE"
                          : intrusion_candidate_present ? "ANY_REPORTABLE_CORE_COMPONENT_IS_INTRUSION_CANDIDATE"
                          : baseline_v3_boundary_warning ? "BASELINE_V3_BOUNDARY_WARNING_NOT_OBSTACLE"
+                         : baseline_v3_mode && baseline_v3_early_frame_intrusion ? "BASELINE_V3_EARLY_CANDIDATE_WAITING_FOR_TEMPORAL_CONFIRMATION"
                          : baseline_v3_mode && frame_intrusion_candidate_present ? "BASELINE_V3_MODEL_ASSIST_WAITING_FOR_TEMPORAL_CONFIRMATION"
                          : baseline_v3_mode && raw_core_return_present ? "BASELINE_V3_WEAK_OR_UNCONFIRMED_CORE_UNKNOWN_NOT_CLEAR"
                          : frame_intrusion_candidate_present ? "MODEL_CANDIDATE_WAITING_FOR_TEMPORAL_CONFIRMATION"
@@ -460,14 +537,14 @@ class CurveEnvelopeNode final : public rclcpp::Node {
          << "\"runtime_transport\":\"ros2\",\"noise_filter_mode\":\"" << noise_filter_mode_ << "\","
          << "\"noise_filter_name\":\"" << (noise_filter_mode_ == "baseline_v3_assist_score" ? "baseline_v3_assist_score" :
                                            noise_filter_mode_ == "baseline_v3" ? "baseline_v3" : "legacy_geometry") << "\","
-         << "\"rail_selection_method\":\"" << lidar_mosmetro3d::RailSelectionMethodName(selection) << "\","
+        << "\"rail_selection_method\":\"" << lidar_mosmetro3d::RailSelectionMethodName(selection) << "\","
          << "\"rail_search_config\":{\"forward_min_m\":" << rail_config_.forward_min
          << ",\"forward_max_m\":" << rail_config_.forward_max
          << ",\"station_length_m\":" << rail_config_.station_length
          << ",\"cell_width_m\":" << rail_config_.cell_width << "},"
         << "\"rail_pair_count\":" << envelope_pairs.size() << ",\"core_count\":" << result.core_count
-        << ",\"reportable_core_count\":" << result.reportable_core_count
-        << ",\"ignored_noise_count\":" << result.ignored_noise_count
+        << ",\"reportable_core_count\":" << public_reportable_core_count
+        << ",\"ignored_noise_count\":" << public_ignored_noise_source_indices.size()
         << ",\"baseline_v3_geometry_obstacle_count\":" << result.baseline_v3_geometry_obstacle_count
         << ",\"baseline_v3_boundary_warning_count\":" << result.baseline_v3_boundary_warning_count
         << ",\"baseline_v3_model_assist_count\":" << result.baseline_v3_model_assist_count
@@ -488,6 +565,12 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         << (baseline_v3_boundary_warning ? "true" : "false")
         << ",\"baseline_v3_model_assist_frame_candidate_present\":"
         << (baseline_v3_model_frame_intrusion ? "true" : "false")
+        << ",\"baseline_v3_early_temporal_consecutive_alarm_frames\":"
+        << early_temporal_decision.consecutive_alarm_frames
+        << ",\"baseline_v3_early_temporal_required_consecutive_frames\":"
+        << kBaselineV3EarlyRequiredConsecutiveFrames
+        << ",\"baseline_v3_early_temporal_confirmed_intrusion_candidate_present\":"
+        << (baseline_v3_early_temporal_intrusion ? "true" : "false")
         << ",\"margin_count\":" << result.margin_count << ",\"outside_reference_count\":" << result.outside_reference_count
         << ",\"unknown_count\":" << result.unknown_count << ",\"processing_ms\":" << elapsed;
     const char* geometry_basis = !forward_extrapolated ? "ASSUMED_CURVE_RAIL_AXIS_FROM_SOURCE_XYZ"
@@ -496,7 +579,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
             : "ASSUMED_CURVE_RAIL_AXIS_WITH_FORWARD_TANGENT_EXTRAPOLATION_SOURCE_XYZ";
     json << ",\"geometry_basis\":\"" << geometry_basis << "\",\"distance_reference\":\"SOURCE_ORIGIN\",\"distance_units\":\"m_ASSUMED\""
          << ",\"noise_filter_status\":\"APPLIED\",\"noise_filter_reason\":\""
-         << (raw_core_return_present && !frame_intrusion_candidate_present ? "ONLY_SPARSE_CORE_GROUPS" : "REPORTABLE_COMPONENT_CHECKED")
+         << (raw_core_return_present && public_reportable_core_source_indices.empty() ? "ONLY_SPARSE_CORE_GROUPS" : "REPORTABLE_COMPONENT_CHECKED")
          << "\",\"noise_filter_config\":{\"connectivity_radius_m\":" << noise_config_.connectivity_radius_m;
     if (noise_filter_mode_ == "legacy") {
       json << ",\"min_reportable_core_points\":" << noise_config_.min_reportable_core_points
@@ -555,7 +638,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       }
       json << "],\"reportable_core_source_indices\":[";
       bool first_reportable_index = true;
-      for (const auto index : result.reportable_core_source_indices) {
+      for (const auto index : public_reportable_core_source_indices) {
         if (!first_reportable_index) json << ',';
         json << map_source_index(index);
         first_reportable_index = false;
@@ -569,7 +652,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       }
       json << "],\"ignored_noise_source_indices\":[";
       bool first_noise_index = true;
-      for (const auto index : result.ignored_noise_source_indices) {
+      for (const auto index : public_ignored_noise_source_indices) {
         if (!first_noise_index) json << ',';
         json << map_source_index(index);
         first_noise_index = false;
@@ -593,13 +676,13 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       const auto offset = result.nearest_core.source_index * 3;
       json << ",\"nearest_intrusion_xyz\":[" << xyz[offset] << ',' << xyz[offset + 1] << ',' << xyz[offset + 2] << ']';
     }
-    if (result.nearest_reportable_core.source_index != std::numeric_limits<std::size_t>::max())
+    if (public_nearest_reportable_core.source_index != std::numeric_limits<std::size_t>::max())
       json << ",\"nearest_reportable_intrusion_source_index\":"
-           << map_source_index(result.nearest_reportable_core.source_index)
+           << map_source_index(public_nearest_reportable_core.source_index)
            << ",\"nearest_reportable_intrusion_distance_from_source_origin_m\":"
-           << result.nearest_reportable_core.distance_from_source_origin_m;
-    if (result.nearest_reportable_core.source_index < xyz.size() / 3) {
-      const auto offset = result.nearest_reportable_core.source_index * 3;
+           << public_nearest_reportable_core.distance_from_source_origin_m;
+    if (public_nearest_reportable_core.source_index < xyz.size() / 3) {
+      const auto offset = public_nearest_reportable_core.source_index * 3;
       json << ",\"nearest_reportable_intrusion_xyz\":[" << xyz[offset] << ',' << xyz[offset + 1] << ',' << xyz[offset + 2] << ']';
     }
     if (result.nearest_margin.source_index != std::numeric_limits<std::size_t>::max())
@@ -625,6 +708,12 @@ class CurveEnvelopeNode final : public rclcpp::Node {
   std::string temporal_last_stamp_ns_;
   bool temporal_last_confirmed_alarm_ = false;
   std::string temporal_last_status_ = "RESET";
+  bool has_early_temporal_state_ = false;
+  bool early_temporal_previous_frame_alarm_ = false;
+  int early_temporal_consecutive_alarm_frames_ = 0;
+  std::string early_temporal_last_stamp_ns_;
+  bool early_temporal_last_confirmed_alarm_ = false;
+  std::string early_temporal_last_status_ = "RESET";
   std::string rail_selection_method_;
   std::string forward_extension_method_;
   double arc_extension_horizon_m_ = 0.0;
