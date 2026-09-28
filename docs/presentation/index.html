@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Обнаружение препятствий в тоннеле метро по 3D-лидару</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --ink: #f4f1ea;
+      --muted: #b9b7b0;
+      --line: #3a3a40;
+      --rail: #39b4a6;
+      --warn: #f2b84b;
+      --danger: #e75d4f;
+      --ok: #8acb62;
+      --panel: #1b1d22;
+      --panel-2: #24262d;
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      letter-spacing: 0;
+    }
+
+    .deck {
+      height: 100%;
+      width: 100%;
+      position: relative;
+    }
+
+    .slide {
+      display: none;
+      height: 100vh;
+      width: 100vw;
+      padding: clamp(28px, 4vw, 64px);
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(57, 180, 166, 0.08), transparent 34%),
+        var(--bg);
+    }
+
+    .slide.active {
+      display: grid;
+      gap: 28px;
+      animation: enter 180ms ease-out;
+    }
+
+    @keyframes enter {
+      from { opacity: 0.35; transform: translateX(12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .two {
+      grid-template-columns: minmax(0, 0.92fr) minmax(340px, 1.08fr);
+      align-items: center;
+    }
+
+    .stack {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .center {
+      place-items: center;
+      text-align: center;
+    }
+
+    .topline {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--muted);
+      font-size: clamp(14px, 1.3vw, 18px);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .topline::before {
+      content: "";
+      width: 48px;
+      height: 3px;
+      background: var(--rail);
+      display: inline-block;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      line-height: 1.02;
+      letter-spacing: 0;
+      max-width: 1120px;
+    }
+
+    h1 {
+      font-size: clamp(44px, 6.8vw, 94px);
+      font-weight: 780;
+    }
+
+    h2 {
+      font-size: clamp(36px, 5vw, 72px);
+      font-weight: 760;
+    }
+
+    h3 {
+      margin: 0 0 12px;
+      font-size: clamp(22px, 2.2vw, 34px);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      font-size: clamp(22px, 2.2vw, 34px);
+      line-height: 1.25;
+      color: var(--muted);
+      max-width: 980px;
+    }
+
+    .lead {
+      color: var(--ink);
+      font-size: clamp(28px, 3.2vw, 46px);
+      line-height: 1.16;
+      max-width: 1120px;
+    }
+
+    .small {
+      font-size: clamp(16px, 1.5vw, 22px);
+      line-height: 1.35;
+      color: var(--muted);
+    }
+
+    .caption {
+      font-size: clamp(14px, 1.2vw, 18px);
+      color: var(--muted);
+    }
+
+    .media {
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      background: #050608;
+      box-shadow: 0 20px 60px var(--shadow);
+    }
+
+    .media-fill {
+      object-fit: cover;
+    }
+
+    .image-frame {
+      display: grid;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .big-number {
+      font-size: clamp(58px, 7.5vw, 120px);
+      line-height: 0.95;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .accent {
+      color: var(--rail);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    .danger {
+      color: var(--danger);
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
+      gap: 12px;
+      width: 100%;
+      align-self: center;
+    }
+
+    .step,
+    .metric,
+    .claim,
+    .limit {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 20px;
+      min-height: 132px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .step strong,
+    .metric strong,
+    .claim strong,
+    .limit strong {
+      font-size: clamp(20px, 1.8vw, 28px);
+      line-height: 1.08;
+      color: var(--ink);
+    }
+
+    .step span,
+    .metric span,
+    .claim span,
+    .limit span {
+      color: var(--muted);
+      font-size: clamp(15px, 1.25vw, 19px);
+      line-height: 1.3;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      width: 100%;
+      align-self: center;
+    }
+
+    .decision {
+      min-height: 210px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .decision .tag {
+      width: fit-content;
+      padding: 5px 10px;
+      font-size: 14px;
+      color: #111;
+      background: var(--rail);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .decision.warn-tag .tag {
+      background: var(--warn);
+    }
+
+    .decision.danger-tag .tag {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      width: 100%;
+    }
+
+    .metric {
+      min-height: 176px;
+      background: var(--panel-2);
+    }
+
+    .metric .value {
+      font-size: clamp(36px, 4vw, 64px);
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+      width: 100%;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      align-self: stretch;
+      min-height: 0;
+    }
+
+    .video-cell {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      min-height: 280px;
+      object-fit: contain;
+      background: #050608;
+      border: 1px solid var(--line);
+    }
+
+    .bar-chart {
+      display: grid;
+      gap: 16px;
+      width: 100%;
+      align-self: center;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr) 110px;
+      gap: 14px;
+      align-items: center;
+      color: var(--muted);
+      font-size: clamp(16px, 1.4vw, 22px);
+    }
+
+    .bar-track {
+      height: 26px;
+      background: #2c2e35;
+      border: 1px solid var(--line);
+    }
+
+    .bar {
+      height: 100%;
+      background: var(--rail);
+    }
+
+    .bar.warnbar {
+      background: var(--warn);
+    }
+
+    .limits {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      width: 100%;
+      align-self: center;
+    }
+
+    .progress {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      height: 5px;
+      width: 100%;
+      background: #2a2c32;
+      z-index: 20;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--rail);
+      transition: width 150ms ease-out;
+    }
+
+    .controls {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .controls button {
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--line);
+      background: rgba(27, 29, 34, 0.88);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .slide-no {
+      min-width: 58px;
+      text-align: center;
+    }
+
+    .source {
+      position: absolute;
+      left: clamp(28px, 4vw, 64px);
+      bottom: 20px;
+      color: #8f918e;
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+
+      .slide {
+        position: relative;
+        min-height: 100vh;
+        height: auto;
+        overflow: visible;
+      }
+
+      .slide:not(.active) {
+        display: none;
+      }
+
+      .slide.active,
+      .two,
+      .split,
+      .flow,
+      .metrics,
+      .limits,
+      .video-grid,
+      .pipeline {
+        grid-template-columns: 1fr;
+      }
+
+      .pipeline,
+      .metrics,
+      .limits,
+      .video-grid {
+        align-self: start;
+      }
+
+      .media,
+      video {
+        min-height: 240px;
+      }
+
+      .bar-row {
+        grid-template-columns: 110px minmax(0, 1fr) 80px;
+      }
+    }
+
+    @media print {
+      html,
+      body {
+        overflow: visible;
+        background: #fff;
+        color: #111;
+      }
+
+      .slide {
+        display: grid !important;
+        position: relative;
+        page-break-after: always;
+        height: 100vh;
+        background: #fff;
+        color: #111;
+      }
+
+      .controls,
+      .progress {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" aria-label="HTML-презентация">
+    <section class="slide active center" data-title="Титул">
+      <div>
+        <div class="topline">lidar_MosMetro3D</div>
+        <h1>Обнаружение препятствий в тоннеле метро по 3D-лидару</h1>
+        <p class="lead">Коротко о решении, архитектуре, алгоритме и проверенных результатах.</p>
+      </div>
+      <div class="source">Материал для неспециалистов. Текущий runtime: baseline_v3.</div>
+    </section>
+
+    <section class="slide two" data-title="Задача">
+      <div>
+        <div class="topline">Задача</div>
+        <h2>Заранее заметить объект, который может помешать движению поезда</h2>
+        <p>Система получает 3D-облако точек от лидара и должна выдать предупреждение, расстояние до ближайшей опасной геометрии и диагностический статус.</p>
+      </div>
+      <div class="image-frame">
+        <img class="media media-fill" src="picts/reference_01_tunnel.png" alt="Исходное облако точек тоннеля">
+        <div class="caption">Лидар видит тоннель как набор точек, а не как готовые объекты.</div>
+      </div>
+    </section>
+
+    <section class="slide two" data-title="Идея">
+      <div>
+        <div class="topline">Ключевая идея</div>
+        <h2>Нам важнее не название объекта, а занимает ли он место поезда</h2>
+        <p>Кабель, инструмент, ящик или человек выглядят по-разному. Но для безопасности главный вопрос один: попадает ли новая геометрия в контролируемый габарит движения.</p>
+      </div>
+      <div class="flow">
+        <div class="decision">
+          <div class="tag">1</div>
+          <h3>Видим точки</h3>
+          <p class="small">Считываем реальное облако `PointCloud2` и отбрасываем некорректные координаты.</p>
+        </div>
+        <div class="decision warn-tag">
+          <div class="tag">2</div>
+          <h3>Строим коридор</h3>
+          <p class="small">По рельсам и оси пути строим область, где должен пройти поезд.</p>
+        </div>
+        <div class="decision danger-tag">
+          <div class="tag">3</div>
+          <h3>Ищем пересечение</h3>
+          <p class="small">Если группа точек внутри габарита, она становится кандидатом на препятствие.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide stack" data-title="Архитектура">
+      <div>
+        <div class="topline">Архитектура pipeline</div>
+        <h2>От облака точек до предупреждения</h2>
+      </div>
+      <div class="pipeline" aria-label="Пайплайн обработки">
+        <div class="step"><strong>PointCloud2 / XYZ</strong><span>входное 3D-облако</span></div>
+        <div class="step"><strong>Рельсы и ось</strong><span>наблюдаем направление пути</span></div>
+        <div class="step"><strong>Габарит</strong><span>строим коридор поезда</span></div>
+        <div class="step"><strong>Компоненты</strong><span>собираем близкие точки в группы</span></div>
+        <div class="step"><strong>baseline_v3</strong><span>geometry-first и temporal assist</span></div>
+        <div class="step"><strong>JSON diagnostics</strong><span>статус, расстояние, причины</span></div>
+      </div>
+      <div class="source">Исполняемый путь: PointCloud2 / XYZ -> observed rail pairs -> tangent train envelope -> raw CORE components -> baseline_v3 -> JSON diagnostics.</div>
+    </section>
+
+    <section class="slide two" data-title="Рельсы">
+      <div>
+        <div class="topline">Шаг 1</div>
+        <h2>Сначала понимаем, где путь</h2>
+        <p>Рельсы и наблюдаемая ось дают системе привязку: где находится зона движения, в какую сторону смотреть и как считать расстояние.</p>
+      </div>
+      <div class="image-frame">
+        <img class="media" src="picts/reference_02_rails_axis.png" alt="Рельсы, ось пути и расстояния">
+        <div class="caption">Рельсы, ось пути, направляющие и расстояния.</div>
+      </div>
+    </section>
+
+    <section class="slide two" data-title="Габарит">
+      <div>
+        <div class="topline">Шаг 2</div>
+        <h2>Затем строим безопасный коридор поезда</h2>
+        <p>Габарит превращает абстрактное облако точек в понятную проверку: всё, что занимает этот коридор, потенциально опасно.</p>
+      </div>
+      <div class="image-frame">
+        <img class="media" src="picts/reference_03_train_envelope.png" alt="Габарит поезда поверх оси пути">
+        <div class="caption">Габарит строится до 80 м как рабочая геометрия, это не заявленная дальность обнаружения.</div>
+      </div>
+    </section>
+
+    <section class="slide two" data-title="Предупреждение">
+      <div>
+        <div class="topline">Шаг 3</div>
+        <h2>Точки рядом с габаритом попадают в предупредительный слой</h2>
+        <p>Это помогает видеть не только глубокое пересечение, но и объекты у границы. При сомнении система не говорит “путь свободен”, а оставляет статус `UNKNOWN`.</p>
+      </div>
+      <div class="image-frame">
+        <img class="media" src="picts/reference_04_warning_margin.png" alt="Точки в предупредительном слое габарита">
+        <div class="caption">Предупредительный слой: габарит плюс 0,5 м.</div>
+      </div>
+    </section>
+
+    <section class="slide stack" data-title="Решение">
+      <div>
+        <div class="topline">Логика решения</div>
+        <h2>Три исхода вместо опасного “ничего не вижу”</h2>
+      </div>
+      <div class="flow">
+        <div class="decision danger-tag">
+          <div class="tag">Obstacle</div>
+          <h3>Есть пересечение</h3>
+          <p class="small">Группа точек физически попадает в габарит или подтверждается temporal-assist логикой.</p>
+        </div>
+        <div class="decision warn-tag">
+          <div class="tag">Warning</div>
+          <h3>Есть кандидат</h3>
+          <p class="small">Ранний сигнал: объект похож на опасный, но это ещё не production safety-доказательство.</p>
+        </div>
+        <div class="decision">
+          <div class="tag">Unknown</div>
+          <h3>Недостаточно уверенности</h3>
+          <p class="small">Неполные данные, слабый объект или спорная геометрия не превращаются в `CLEAR`.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide two" data-title="Детекция">
+      <div>
+        <div class="topline">Пример</div>
+        <h2>Препятствие найдено, расстояние показано в метрах</h2>
+        <p>Текущий выход сообщает `intrusion_candidate_present`, ближайшую reportable-точку и диагностику. Расстояние считается от source LiDAR origin, не от носа поезда.</p>
+      </div>
+      <div class="image-frame">
+        <img class="media" src="picts/reference_05_obstacle.png" alt="Пример препятствия в doubleT_obstacle">
+        <div class="caption">Пример из `doubleT_obstacle` с ближайшей дистанцией.</div>
+      </div>
+    </section>
+
+    <section class="slide stack" data-title="Видео">
+      <div>
+        <div class="topline">Демонстрация</div>
+        <h2>Короткие видео показывают, как подсветка появляется на сцене</h2>
+      </div>
+      <div class="video-grid">
+        <div class="video-cell">
+          <video src="videos/reference_05_obstacle.mp4" controls muted playsinline preload="metadata"></video>
+          <div class="caption">`doubleT_obstacle`: реальная development-positive сцена.</div>
+        </div>
+        <div class="video-cell">
+          <video src="videos/reference_05_obstacle_fake2.mp4" controls muted playsinline preload="metadata"></video>
+          <div class="caption">Fake-object window: проверка сценария с добавленным объектом.</div>
+        </div>
+        <div class="video-cell">
+          <video src="videos/reference_05_obstacle_fake3.mp4" controls muted playsinline preload="metadata"></video>
+          <div class="caption">Ещё один вариант демонстрационного окна.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide stack" data-title="Метрики">
+      <div>
+        <div class="topline">Результаты детекции</div>
+        <h2>Что уже измерено на доступных replay-источниках</h2>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span>real frames, текущий срез</span><div class="value"><span class="ok">51</span> TP</div><span>`doubleT_obstacle`: 51 найденный positive frame.</span></div>
+        <div class="metric"><span>пропуск</span><div class="value"><span class="warn">1</span> FN</div><span>Один initial FN в development-positive окне.</span></div>
+        <div class="metric"><span>screening windows</span><div class="value"><span class="ok">6/6</span></div><span>`cloud_with_fake_obj`: все проверенные positive events hit.</span></div>
+        <div class="metric"><span>важное ограничение</span><div class="value"><span class="danger">47</span> FP</div><span>`new_data`: ложноположительные кадры, не 47 независимых событий.</span></div>
+      </div>
+      <p class="small">Эти числа нужно представлять как воспроизводимый срез прототипа, а не как скрытый независимый test set.</p>
+    </section>
+
+    <section class="slide stack" data-title="Дальность">
+      <div>
+        <div class="topline">Дальность обнаружения</div>
+        <h2>Первые срабатывания на доступных positive windows</h2>
+      </div>
+      <div class="split">
+        <div class="claim">
+          <strong><span class="big-number accent">55,58 м</span></strong>
+          <span>Первая public detection на real development interval `doubleT_obstacle`.</span>
+        </div>
+        <div class="claim">
+          <strong><span class="big-number accent">68,07 м</span></strong>
+          <span>Самая дальняя первая public detection на user-visible `cloud_with_fake_obj` окнах.</span>
+        </div>
+      </div>
+      <p class="small">Это расстояния от source LiDAR origin. `80 м` в конфигурации остается горизонтом построения габарита, а не доказанной рабочей дальностью.</p>
+    </section>
+
+    <section class="slide stack" data-title="Скорость">
+      <div>
+        <div class="topline">Быстродействие</div>
+        <h2>C++ detector compute укладывается в ориентир 10 Hz на проверенном bag</h2>
+      </div>
+      <div class="bar-chart" aria-label="График задержки обработки">
+        <div class="bar-row"><span>p50</span><div class="bar-track"><div class="bar" style="width:67%"></div></div><strong>67,12 ms</strong></div>
+        <div class="bar-row"><span>p95</span><div class="bar-track"><div class="bar" style="width:72%"></div></div><strong>71,78 ms</strong></div>
+        <div class="bar-row"><span>p99</span><div class="bar-track"><div class="bar" style="width:73%"></div></div><strong>73,40 ms</strong></div>
+        <div class="bar-row"><span>max</span><div class="bar-track"><div class="bar warnbar" style="width:75%"></div></div><strong>74,96 ms</strong></div>
+        <div class="bar-row"><span>бюджет</span><div class="bar-track"><div class="bar warnbar" style="width:100%"></div></div><strong>100 ms</strong></div>
+      </div>
+      <p class="small">Замер: headless ROS2/C++ path, `diagnostics_detail=summary`, один development bag. Full end-to-end replay на целевом стенде ещё требует отдельной проверки.</p>
+    </section>
+
+    <section class="slide stack" data-title="Что доказано">
+      <div>
+        <div class="topline">Честные границы</div>
+        <h2>Что можно заявлять уверенно, а что пока нет</h2>
+      </div>
+      <div class="limits">
+        <div class="limit">
+          <strong class="ok">Можно заявлять</strong>
+          <span>Есть воспроизводимый Docker/ROS2 prototype, который строит габарит, находит кандидаты и публикует JSON diagnostics.</span>
+        </div>
+        <div class="limit">
+          <strong class="warn">Нужно уточнять</strong>
+          <span>Метрики посчитаны на доступных development/screening источниках, без независимого hidden-positive test.</span>
+        </div>
+        <div class="limit">
+          <strong class="danger">Нельзя завышать</strong>
+          <span>Это не production-certified система и не модуль прямого управления торможением.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide center" data-title="Финал">
+      <div>
+        <div class="topline">Итог</div>
+        <h2>Решение превращает сложное 3D-облако в понятный вопрос безопасности</h2>
+        <p class="lead">Есть ли новая геометрия в пространстве, где должен пройти поезд?</p>
+        <p>Если да, система поднимает предупреждение и показывает расстояние. Если данных недостаточно, она честно говорит `UNKNOWN`.</p>
+      </div>
+      <div class="source">Навигация: стрелки, PageUp/PageDown, Home/End. Видео запускаются вручную.</div>
+    </section>
+  </main>
+
+  <div class="controls" aria-label="Навигация по слайдам">
+    <button type="button" id="prev" aria-label="Предыдущий слайд">&#8249;</button>
+    <span class="slide-no" id="slideNo">1 / 15</span>
+    <button type="button" id="next" aria-label="Следующий слайд">&#8250;</button>
+  </div>
+  <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    const slideNo = document.getElementById("slideNo");
+    const progressBar = document.getElementById("progressBar");
+    const prev = document.getElementById("prev");
+    const next = document.getElementById("next");
+    let current = 0;
+
+    function stopVideos(slide) {
+      slide.querySelectorAll("video").forEach((video) => {
+        video.pause();
+      });
+    }
+
+    function show(index) {
+      const nextIndex = Math.max(0, Math.min(index, slides.length - 1));
+      if (nextIndex === current && slides[current].classList.contains("active")) {
+        return;
+      }
+      stopVideos(slides[current]);
+      slides[current].classList.remove("active");
+      current = nextIndex;
+      slides[current].classList.add("active");
+      slideNo.textContent = `${current + 1} / ${slides.length}`;
+      progressBar.style.width = `${((current + 1) / slides.length) * 100}%`;
+      const title = slides[current].dataset.title || `Слайд ${current + 1}`;
+      document.title = `${title} - Обнаружение препятствий`;
+      history.replaceState(null, "", `#${current + 1}`);
+    }
+
+    function fromHash() {
+      const raw = window.location.hash.replace("#", "");
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= slides.length) {
+        current = 0;
+        slides.forEach((slide, idx) => slide.classList.toggle("active", idx === 0));
+        show(parsed - 1);
+      } else {
+        slideNo.textContent = `1 / ${slides.length}`;
+        progressBar.style.width = `${(1 / slides.length) * 100}%`;
+      }
+    }
+
+    prev.addEventListener("click", () => show(current - 1));
+    next.addEventListener("click", () => show(current + 1));
+    window.addEventListener("hashchange", fromHash);
+    window.addEventListener("keydown", (event) => {
+      const tag = event.target && event.target.tagName;
+      if (tag === "VIDEO" || tag === "BUTTON") {
+        return;
+      }
+      if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+        event.preventDefault();
+        show(current + 1);
+      }
+      if (["ArrowLeft", "PageUp", "Backspace"].includes(event.key)) {
+        event.preventDefault();
+        show(current - 1);
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        show(0);
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        show(slides.length - 1);
+      }
+    });
+
+    fromHash();
+  </script>
+</body>
+</html>
