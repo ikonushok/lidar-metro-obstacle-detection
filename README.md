@@ -36,6 +36,22 @@
 
 Скрипт печатает команды для просмотра JSON и воспроизведения записи. Выходной топик — `/stage_3/curve_envelope_candidate`; в JSON проверяйте `intrusion_candidate_present`, ближайшее расстояние, `status` и `reason`. Подробный сценарий с командами ROS2 и вариант для Ubuntu: [SOLUTION.md](SOLUTION.md#74-запустить-headless-ros2-replay).
 
+Для проверки быстродействия без плеера запустите detector container в компактном
+production/perf режиме и затем выполните измеритель:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 `
+  -StopExisting -Rate 1.0 -ReadAheadQueueSize 20 -DiagnosticsDetail summary
+
+python .\scripts\measure_headless_ros2_cpp_performance.py `
+  --rate 1.0 --read-ahead-queue-size 20 --expected-messages 201 `
+  --collector-timeout-seconds 210 `
+  --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
+```
+
+Скрипт запускает `ros2 bag play`, собирает выходные JSON, `processing_ms`,
+`docker stats` и сохраняет артефакты в `artefacts/current_model_validation/`.
+
 ## Плеер с архивами организаторов
 
 Для просмотра известных записей в браузере нужен работающий Docker с Compose. Положите три архива в `dataset/raw/`: `for_hackathon`, `new_data`, `cloud_with_fake_obj`. Данные не входят в Git и не скачиваются автоматически; допустимые расширения описаны в [инструкции подготовки](docs/REVIEWER_QUICKSTART.md).
@@ -51,10 +67,13 @@ docker compose up --build
 - **Оранжевое «Возможное препятствие на XX м»** — экспериментальный предварительный сигнал. C++ нашёл внутри габарита группу точек подходящей формы; плеер показывает надпись после трёх кадров подряд с таким кандидатом. Это не подтверждённая тревога: статус может оставаться `UNKNOWN`, а плеер не проверяет, что в трёх кадрах виден один и тот же объект.
 - **Красное «Препятствие на XX м»** — основной C++ детектор выдал `intrusion_candidate_present=true`; плеер окрашивает его подтверждённые точки красным. Это решение алгоритма, а не гарантия реального препятствия. На `new_data`, где по сообщению пользователя препятствий нет, 47 кадров с красной тревогой считаются ложноположительными; плеер помечает их как «Ложная тревога».
 
+Под ползунком кадров жёлтые полосы показывают предоставленные пользователем интервалы видимости объектов. Оранжевые и красные метки появляются только после просмотра соответствующих кадров в плеере. Кнопки `01`–`10` служат для перехода к объектам; отсутствие оранжевой или красной метки на непросмотренном кадре ничего не говорит о результате детектора.
+
 ## Результат и границы
 
 - Выход: кандидат препятствия, ближайшее расстояние от начала координат исходного облака, статус и diagnostics.
 - `UNKNOWN` и отсутствие кандидата **не означают свободный путь**. Решение не выдаёт разрешение движения.
+- Headless ROS2/C++ замер без плеера на `doubleT_obstacle` в `diagnostics_detail=summary`: `processing_ms` p95 `71.78` ms, max `74.96` ms. Это укладывается в вычислительный бюджет порядка `100` ms для `10 Hz`, но локальный Windows/Docker replay всё ещё дал `187/201` JSON и `Message queue starved`; полный end-to-end real-time на целевом Ubuntu-стенде не заявлен.
 - Монтаж лидара, физический габарит и качество на независимых положительных проездах не подтверждены. `80 м` — граница поиска, а не измеренная дальность обнаружения.
 - Это хакатонный прототип, не сертифицированная система управления поездом. [Текущие проверки и пробелы](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) приведены отдельно.
 
@@ -80,6 +99,7 @@ docker compose up --build
 - [DEVELOPMENT_HISTORY_AND_STATUS.md](docs/DEVELOPMENT_HISTORY_AND_STATUS.md) — выполненные этапы, текущий статус и оставшиеся задачи.
 - [SUBMISSION_READINESS_REPORT.md](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) — подтверждённые результаты и пробелы к критериям сдачи.
 - [ROS2_HEADLESS_DEMO_VERIFICATION.md](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md) — журнал проверки ROS2-демо без браузера.
+- [HEADLESS_ROS2_CPP_PERFORMANCE.md](docs/reports/submission/HEADLESS_ROS2_CPP_PERFORMANCE.md) — замер быстродействия ROS2 → C++ detector без плеера.
 - [Техническое задание](docs/hackathon_documentations/5.%20ДепТранспорта.pdf) — требования заказчика к решению и среде запуска.
 - [Инструкция по сдаче](docs/hackathon_documentations/instruction.md) — правила передачи материалов и стоп-кода.
 

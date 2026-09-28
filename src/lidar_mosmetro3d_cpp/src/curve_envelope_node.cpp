@@ -30,6 +30,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     source_frame_ = declare_parameter<std::string>("source_frame", "hesai_lidar");
     compute_backend_ = declare_parameter<std::string>("compute_backend", "cpu");
     noise_filter_mode_ = declare_parameter<std::string>("noise_filter_mode", "baseline_v3");
+    diagnostics_detail_ = declare_parameter<std::string>("diagnostics_detail", "full");
     temporal_confirmation_enabled_ = declare_parameter<bool>("temporal_confirmation_enabled", true);
     temporal_required_consecutive_frames_ = declare_parameter<int>("temporal_required_consecutive_frames", 2);
     if (temporal_required_consecutive_frames_ <= 0) {
@@ -224,6 +225,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
                   "\"reportable_intrusion_candidate_present\":null,\"raw_core_return_present\":null,"
                   "\"all_core_returns_are_intrusion_candidates\":false,\"margin_return_present\":null,"
                   "\"compute_backend_requested\":\"" + BackendRequestName() +
+                  "\",\"diagnostics_detail\":\"" + JsonEscape(diagnostics_detail_) +
                   "\",\"runtime_transport\":\"ros2\",\"noise_filter_mode\":\"" + JsonEscape(noise_filter_mode_) +
                   "\",\"temporal_confirmation_enabled\":" + std::string(temporal_confirmation_enabled_ ? "true" : "false") +
                   ",\"temporal_required_consecutive_frames\":" + std::to_string(temporal_required_consecutive_frames_) +
@@ -270,16 +272,29 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         cloud.point_step == 0 || fields["x"].offset + 4 > cloud.point_step || fields["y"].offset + 4 > cloud.point_step || fields["z"].offset + 4 > cloud.point_step ||
         cloud.row_step < cloud.width * cloud.point_step || cloud.data.size() < static_cast<std::size_t>(cloud.row_step) * cloud.height)
       return PublishUnknown("UNSUPPORTED_POINTCLOUD_XYZ_SCHEMA", cloud);
-    std::vector<float> xyz; xyz.reserve(static_cast<std::size_t>(cloud.width) * cloud.height * 3);
+    const auto x_offset = fields["x"].offset;
+    const auto y_offset = fields["y"].offset;
+    const auto z_offset = fields["z"].offset;
+    const auto total_points = static_cast<std::size_t>(cloud.width) * cloud.height;
+    std::vector<float> xyz; xyz.reserve(total_points * 3);
+    std::vector<std::size_t> source_indices;
+    source_indices.reserve(total_points);
     for (std::uint32_t row = 0; row < cloud.height; ++row) for (std::uint32_t column = 0; column < cloud.width; ++column) {
       const auto* point = cloud.data.data() + static_cast<std::size_t>(row) * cloud.row_step + static_cast<std::size_t>(column) * cloud.point_step;
       float x, y, z;
-      std::memcpy(&x, point + fields["x"].offset, sizeof(float));
-      std::memcpy(&y, point + fields["y"].offset, sizeof(float));
-      std::memcpy(&z, point + fields["z"].offset, sizeof(float));
+      std::memcpy(&x, point + x_offset, sizeof(float));
+      std::memcpy(&y, point + y_offset, sizeof(float));
+      std::memcpy(&z, point + z_offset, sizeof(float));
       if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) return PublishUnknown("NONFINITE_XYZ", cloud);
-      xyz.insert(xyz.end(), {x, y, z});
+      if (x == 0.0F && y == 0.0F && z == 0.0F) continue;
+      source_indices.push_back(static_cast<std::size_t>(row) * cloud.width + column);
+      xyz.push_back(x);
+      xyz.push_back(y);
+      xyz.push_back(z);
     }
+    const auto map_source_index = [&source_indices](std::size_t compact_index) -> std::size_t {
+      return compact_index < source_indices.size() ? source_indices[compact_index] : compact_index;
+    };
     if (!(core_.left < core_.right && core_.bottom < core_.top && expanded_.left <= core_.left && expanded_.right >= core_.right &&
            expanded_.bottom <= core_.bottom && expanded_.top >= core_.top)) return PublishUnknown("INVALID_ENVELOPE", cloud, xyz.size() / 3);
     if (compute_backend_ != "auto" && compute_backend_ != "cpu" && compute_backend_ != "cuda")
@@ -287,6 +302,8 @@ class CurveEnvelopeNode final : public rclcpp::Node {
     if (noise_filter_mode_ != "legacy" && noise_filter_mode_ != "baseline_v3_assist_score" &&
         noise_filter_mode_ != "baseline_v3")
       return PublishUnknown("INVALID_NOISE_FILTER_MODE", cloud, xyz.size() / 3);
+    if (diagnostics_detail_ != "full" && diagnostics_detail_ != "summary")
+      return PublishUnknown("INVALID_DIAGNOSTICS_DETAIL", cloud, xyz.size() / 3);
     lidar_mosmetro3d::RailSelectionMethod selection;
     if (rail_selection_method_ == "baseline") selection = lidar_mosmetro3d::RailSelectionMethod::kBaseline;
     else if (rail_selection_method_ == "development_candidate") selection = lidar_mosmetro3d::RailSelectionMethod::kDevelopmentCandidate;
@@ -376,8 +393,13 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       lidar_mosmetro3d::ApplyBaselineV3(
           xyz.data(), xyz.size() / 3, result, noise_config_.connectivity_radius_m);
     }
-    const auto core_wireframe = lidar_mosmetro3d::BuildCurveEnvelopeWireframe(envelope_pairs, core_);
-    const auto expanded_wireframe = lidar_mosmetro3d::BuildCurveEnvelopeWireframe(envelope_pairs, expanded_);
+    const bool verbose_diagnostics = diagnostics_detail_ == "full";
+    std::vector<lidar_mosmetro3d::LineSegment3f> core_wireframe;
+    std::vector<lidar_mosmetro3d::LineSegment3f> expanded_wireframe;
+    if (verbose_diagnostics) {
+      core_wireframe = lidar_mosmetro3d::BuildCurveEnvelopeWireframe(envelope_pairs, core_);
+      expanded_wireframe = lidar_mosmetro3d::BuildCurveEnvelopeWireframe(envelope_pairs, expanded_);
+    }
     const auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     const bool raw_core_return_present = result.core_count > 0;
     const bool baseline_v3_mode = noise_filter_mode_ == "baseline_v3";
@@ -434,6 +456,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
         << ",\"raw_core_return_present\":" << (raw_core_return_present ? "true" : "false")
         << ",\"all_core_returns_are_intrusion_candidates\":false,\"margin_return_present\":" << (margin_return_present ? "true" : "false")
          << ",\"compute_backend_requested\":\"" << BackendRequestName() << "\",\"compute_backend_used\":\"" << backend_used << "\","
+         << "\"diagnostics_detail\":\"" << diagnostics_detail_ << "\","
          << "\"runtime_transport\":\"ros2\",\"noise_filter_mode\":\"" << noise_filter_mode_ << "\","
          << "\"noise_filter_name\":\"" << (noise_filter_mode_ == "baseline_v3_assist_score" ? "baseline_v3_assist_score" :
                                            noise_filter_mode_ == "baseline_v3" ? "baseline_v3" : "legacy_geometry") << "\","
@@ -501,73 +524,78 @@ class CurveEnvelopeNode final : public rclcpp::Node {
          << ",\"observed_support_end_source_s_m\":" << rails.rail_pairs.back().source_s_m
          << ",\"envelope_forward_end_source_s_m\":" << envelope_pairs.back().source_s_m
          << ",\"core_bounds_source_axis\":[" << core_.left << ',' << core_.right << ',' << core_.bottom << ',' << core_.top << ']'
-         << ",\"expanded_bounds_source_axis\":[" << expanded_.left << ',' << expanded_.right << ',' << expanded_.bottom << ',' << expanded_.top << ']'
-         << ",\"core_envelope_wireframe_source_xyz\":";
-    AppendWireframeJson(json, core_wireframe);
-    json << ",\"expanded_envelope_wireframe_source_xyz\":";
-    AppendWireframeJson(json, expanded_wireframe);
-    json << ",\"curve_axis_polyline_source_xyz\":[";
-    for (std::size_t i = 0; i < envelope_pairs.size(); ++i) {
-      const auto& pair = envelope_pairs[i];
-      if (i) json << ',';
-      json << '[' << (static_cast<double>(pair.left.x) + pair.right.x) / 2.0 << ','
-           << (static_cast<double>(pair.left.y) + pair.right.y) / 2.0 << ','
-           << (static_cast<double>(pair.left.z) + pair.right.z) / 2.0 << ']';
+         << ",\"expanded_bounds_source_axis\":[" << expanded_.left << ',' << expanded_.right << ',' << expanded_.bottom << ',' << expanded_.top << ']';
+    if (verbose_diagnostics) {
+      json << ",\"core_envelope_wireframe_source_xyz\":";
+      AppendWireframeJson(json, core_wireframe);
+      json << ",\"expanded_envelope_wireframe_source_xyz\":";
+      AppendWireframeJson(json, expanded_wireframe);
+      json << ",\"curve_axis_polyline_source_xyz\":[";
+      for (std::size_t i = 0; i < envelope_pairs.size(); ++i) {
+        const auto& pair = envelope_pairs[i];
+        if (i) json << ',';
+        json << '[' << (static_cast<double>(pair.left.x) + pair.right.x) / 2.0 << ','
+             << (static_cast<double>(pair.left.y) + pair.right.y) / 2.0 << ','
+             << (static_cast<double>(pair.left.z) + pair.right.z) / 2.0 << ']';
+      }
+      json << "],\"rail_pairs_source_xyz\":[";
+      for (std::size_t i = 0; i < envelope_pairs.size(); ++i) {
+        const auto& pair = envelope_pairs[i];
+        if (i) json << ',';
+        json << "{\"source_s_m\":" << pair.source_s_m << ",\"left_xyz\":[" << pair.left.x << ',' << pair.left.y << ',' << pair.left.z
+             << "],\"right_xyz\":[" << pair.right.x << ',' << pair.right.y << ',' << pair.right.z
+             << "],\"observed\":" << (i < observed_rail_pair_count ? "true" : "false") << "}";
+      }
+      json << "],\"core_source_indices\":[";
+      bool first_core_index = true;
+      for (std::size_t i = 0; i < result.labels.size(); ++i) if (result.labels[i] == lidar_mosmetro3d::Zone::kCore) {
+        if (!first_core_index) json << ',';
+        json << map_source_index(i);
+        first_core_index = false;
+      }
+      json << "],\"reportable_core_source_indices\":[";
+      bool first_reportable_index = true;
+      for (const auto index : result.reportable_core_source_indices) {
+        if (!first_reportable_index) json << ',';
+        json << map_source_index(index);
+        first_reportable_index = false;
+      }
+      json << "],\"experimental_early_source_indices\":[";
+      bool first_early_index = true;
+      for (const auto index : result.baseline_v3_early_candidate_source_indices) {
+        if (!first_early_index) json << ',';
+        json << map_source_index(index);
+        first_early_index = false;
+      }
+      json << "],\"ignored_noise_source_indices\":[";
+      bool first_noise_index = true;
+      for (const auto index : result.ignored_noise_source_indices) {
+        if (!first_noise_index) json << ',';
+        json << map_source_index(index);
+        first_noise_index = false;
+      }
+      json << "],\"margin_source_indices\":[";
+      bool first_margin_index = true;
+      for (std::size_t i = 0; i < result.labels.size(); ++i) if (result.labels[i] == lidar_mosmetro3d::Zone::kMargin) {
+        if (!first_margin_index) json << ',';
+        json << map_source_index(i);
+        first_margin_index = false;
+      }
+      json << ']';
+    } else {
+      json << ",\"detail_arrays_omitted\":true";
     }
-    json << "],\"rail_pairs_source_xyz\":[";
-    for (std::size_t i = 0; i < envelope_pairs.size(); ++i) {
-      const auto& pair = envelope_pairs[i];
-      if (i) json << ',';
-      json << "{\"source_s_m\":" << pair.source_s_m << ",\"left_xyz\":[" << pair.left.x << ',' << pair.left.y << ',' << pair.left.z
-           << "],\"right_xyz\":[" << pair.right.x << ',' << pair.right.y << ',' << pair.right.z
-           << "],\"observed\":" << (i < observed_rail_pair_count ? "true" : "false") << "}";
-    }
-    json << "],\"core_source_indices\":[";
-    bool first_core_index = true;
-    for (std::size_t i = 0; i < result.labels.size(); ++i) if (result.labels[i] == lidar_mosmetro3d::Zone::kCore) {
-      if (!first_core_index) json << ',';
-      json << i;
-      first_core_index = false;
-    }
-    json << "],\"reportable_core_source_indices\":[";
-    bool first_reportable_index = true;
-    for (const auto index : result.reportable_core_source_indices) {
-      if (!first_reportable_index) json << ',';
-      json << index;
-      first_reportable_index = false;
-    }
-    json << "],\"experimental_early_source_indices\":[";
-    bool first_early_index = true;
-    for (const auto index : result.baseline_v3_early_candidate_source_indices) {
-      if (!first_early_index) json << ',';
-      json << index;
-      first_early_index = false;
-    }
-    json << "],\"ignored_noise_source_indices\":[";
-    bool first_noise_index = true;
-    for (const auto index : result.ignored_noise_source_indices) {
-      if (!first_noise_index) json << ',';
-      json << index;
-      first_noise_index = false;
-    }
-    json << "],\"margin_source_indices\":[";
-    bool first_margin_index = true;
-    for (std::size_t i = 0; i < result.labels.size(); ++i) if (result.labels[i] == lidar_mosmetro3d::Zone::kMargin) {
-      if (!first_margin_index) json << ',';
-      json << i;
-      first_margin_index = false;
-    }
-    json << ']';
     if (!backend_fallback_reason.empty()) json << ",\"compute_backend_fallback\":\"" << backend_fallback_reason << "\"";
     if (result.nearest_core.source_index != std::numeric_limits<std::size_t>::max())
-      json << ",\"nearest_intrusion_source_index\":" << result.nearest_core.source_index
+      json << ",\"nearest_intrusion_source_index\":" << map_source_index(result.nearest_core.source_index)
            << ",\"nearest_intrusion_distance_from_source_origin_m\":" << result.nearest_core.distance_from_source_origin_m;
     if (result.nearest_core.source_index < xyz.size() / 3) {
       const auto offset = result.nearest_core.source_index * 3;
       json << ",\"nearest_intrusion_xyz\":[" << xyz[offset] << ',' << xyz[offset + 1] << ',' << xyz[offset + 2] << ']';
     }
     if (result.nearest_reportable_core.source_index != std::numeric_limits<std::size_t>::max())
-      json << ",\"nearest_reportable_intrusion_source_index\":" << result.nearest_reportable_core.source_index
+      json << ",\"nearest_reportable_intrusion_source_index\":"
+           << map_source_index(result.nearest_reportable_core.source_index)
            << ",\"nearest_reportable_intrusion_distance_from_source_origin_m\":"
            << result.nearest_reportable_core.distance_from_source_origin_m;
     if (result.nearest_reportable_core.source_index < xyz.size() / 3) {
@@ -575,7 +603,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
       json << ",\"nearest_reportable_intrusion_xyz\":[" << xyz[offset] << ',' << xyz[offset + 1] << ',' << xyz[offset + 2] << ']';
     }
     if (result.nearest_margin.source_index != std::numeric_limits<std::size_t>::max())
-      json << ",\"nearest_margin_source_index\":" << result.nearest_margin.source_index
+      json << ",\"nearest_margin_source_index\":" << map_source_index(result.nearest_margin.source_index)
            << ",\"nearest_margin_distance_from_source_origin_m\":" << result.nearest_margin.distance_from_source_origin_m;
     json << "}";
     output.data = json.str(); publisher_->publish(output);
@@ -588,6 +616,7 @@ class CurveEnvelopeNode final : public rclcpp::Node {
   std::string source_frame_;
   std::string compute_backend_;
   std::string noise_filter_mode_;
+  std::string diagnostics_detail_;
   bool temporal_confirmation_enabled_ = true;
   int temporal_required_consecutive_frames_ = 2;
   bool has_temporal_state_ = false;

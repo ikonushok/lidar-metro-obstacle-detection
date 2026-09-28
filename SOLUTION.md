@@ -256,12 +256,37 @@ docker run --rm -d --name lidar-detector --shm-size=1g \
   -p output_topic:=/stage_3/curve_envelope_candidate \
   -p compute_backend:=cpu -p rail_selection_method:=development_candidate \
   -p rail_forward_min_m:=2.0 -p forward_extension_method:=tangent \
-  -p noise_filter_mode:=baseline_v3
+  -p noise_filter_mode:=baseline_v3 -p diagnostics_detail:=summary
 ```
 
 Команды `docker exec` для чтения выхода и воспроизведения записи приведены выше:
 они одинаковы для PowerShell и Bash. Перед повторным запуском остановите
 контейнер через `docker stop lidar-detector`.
+
+### 7.5. Замерить быстродействие headless ROS2/C++ без плеера
+
+Для performance-проверки основного ROS2 path используйте compact
+production/perf diagnostics:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 `
+  -StopExisting `
+  -Rate 1.0 `
+  -ReadAheadQueueSize 20 `
+  -DiagnosticsDetail summary
+
+python .\scripts\measure_headless_ros2_cpp_performance.py `
+  --rate 1.0 `
+  --read-ahead-queue-size 20 `
+  --expected-messages 201 `
+  --collector-timeout-seconds 210 `
+  --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
+```
+
+Скрипт запускает `ros2 bag play /data`, слушает
+`/stage_3/curve_envelope_candidate`, считает p50/p95/p99/max по
+`processing_ms`, сохраняет `docker stats`, stdout/stderr replay и JSONL
+сообщений в `artefacts/current_model_validation/`.
 
 ## 8. Подтверждённые проверки текущего среза
 
@@ -277,19 +302,27 @@ docker run --rm -d --name lidar-detector --shm-size=1g \
 | Direct player HTTP timing `new_data` 1050-1150 | processing p95 `52.25` ms; HTTP wall p95 `133.16` ms; HTTP wall p99 `1932.03` ms |
 | ROS2 parity/timing `doubleT_obstacle` | PASS, `201` cases, wall `137.557` s |
 | Headless ROS2 wrapper smoke | PASS: `run_submission_ros2_demo.ps1`, `ros2 topic echo --once` получил JSON с `runtime_transport=ros2`, `noise_filter_mode=baseline_v3`, `safety_decision_permitted=false` |
+| Headless ROS2 C++ performance без плеера, `doubleT_obstacle`, `--rate 1.0`, `diagnostics_detail=summary` | `187/201` JSON, `processing_ms` p95 `71.78` ms, p99 `73.40` ms, max `74.96` ms; `Message queue starved`, Docker CPU max `146.06%`, RAM max `929.1` MiB |
 
 Docker image, зафиксированный в проверке:
 
 ```text
-sha256:9686850054da221452d9fe0ee65ed4932ad78581274fc947865d8bfa9e7e0ec1
+sha256:e292698a910bd605d75f571f89f5c10fedb499e6a3259cedf418fcddb001e4be
 ```
 
-Свежий ROS2-прогон подтверждает parity/integration в Docker/Humble, но не
-доказывает production real-time throughput. Direct HTTP timing показывает, что
-C++ compute p95 держится около `52` мс, а full HTTP path имеет длинные хвосты.
+Свежий ROS2-прогон подтверждает parity/integration в Docker/Humble. После
+оптимизации C++ detector path в compact production/perf режиме имеет
+`processing_ms` p95 `71.78` ms на `doubleT_obstacle`, то есть вычислительно
+укладывается в ориентир `100` ms для потока около `10 Hz`. Но локальный
+Windows/Docker replay всё ещё показывает `187/201` выходных JSON и
+`Message queue starved`, поэтому полный end-to-end real-time claim требует
+повтора на целевом Ubuntu/Humble/Docker стенде.
 
 Подробный журнал проверок:
 `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md`.
+
+Замер быстродействия ROS2/C++ без плеера:
+`docs/reports/submission/HEADLESS_ROS2_CPP_PERFORMANCE.md`.
 
 Сводка оставшихся разрывов к критериям жюри:
 `docs/reports/submission/SUBMISSION_READINESS_REPORT.md`.
@@ -305,8 +338,9 @@ C++ compute p95 держится около `52` мс, а full HTTP path име�
 - `baseline_v3` интегрирован в direct/ROS2 runtime, но требует дальнейших
   независимых replay/latency/throughput-проверок перед production-claim.
 - `UNKNOWN` не превращается в `CLEAR`.
-- Full real-time, p95/p99 latency, drops и ресурсы на целевом стенде не
-  заявлены.
+- Full end-to-end real-time, drops и ресурсы на целевом стенде не заявлены;
+  текущий detector compute укладывается в `10 Hz`-ориентир, но локальный replay
+  зафиксировал недобор выходов и `Message queue starved`.
 - CUDA, deskew, tracking, TTC и управление поездом не входят в MVP для сдачи.
 - Synthetic/fake-object dataset нужен для демонстрационной проверки, но не
   заменяет скрытую проверку жюри на реальных данных.
@@ -320,6 +354,9 @@ SOLUTION.md                                    Описание архитект
 scripts/prepare_hackathon_datasets.py          Подготовка локальных архивов и распаковок записей для player/ROS2.
 scripts/run_stage_2_cpu_player.ps1             Запуск direct C++ HTTP-плеера с выбранными runtime-параметрами.
 scripts/run_submission_ros2_demo.ps1           Headless ROS2 wrapper: detector container, topic echo и bag play команды.
+scripts/measure_headless_ros2_cpp_performance.py
+                                                Headless ROS2/C++ performance-run без browser/HTTP player.
+scripts/headless_ros2_perf_collector.py         Collector, копируемый measurement-скриптом внутрь контейнера.
 scripts/serve_stage_2_cpu_catalog.py           HTTP catalog/player server для подготовленных локальных датасетов.
 scripts/cpu_catalog_runtime.py                 Python-обвязка C++ runtime для чтения источников и отдачи JSON плееру.
 scripts/check_submission_package.py            Read-only gate состава репозитория перед публичной передачей.

@@ -44,6 +44,7 @@ PointCloud2 / XYZ
 | Public src surface | В проверочном пакете оставлены C++ ядро, ROS2 node и reader/player helpers |
 | Direct player | Локальный запуск читает подготовленные источники и возвращает JSON |
 | ROS2 wrapper smoke | Headless wrapper запускает detector container и получает JSON через ROS2 topic |
+| Headless ROS2 performance script | `scripts/measure_headless_ros2_cpp_performance.py` запускает replay, считает `processing_ms` и сохраняет Docker stats; актуальный performance-run использует `diagnostics_detail=summary` |
 | Package gate | Проверяет README, SOLUTION, docs, scripts, src, `.gitignore` и отсутствие данных в Git |
 
 Детали проверок: [SUBMISSION_READINESS_REPORT.md](reports/submission/SUBMISSION_READINESS_REPORT.md)
@@ -61,8 +62,9 @@ PointCloud2 / XYZ
   измеренная дальность обнаружения.
 - Расстояние в JSON считается от начала координат исходного облака, не от носа
   поезда.
-- Full real-time throughput, drops, p95/p99 latency и ресурсы на стенде
-  организатора требуют отдельного замера.
+- Detector compute на `doubleT_obstacle` в compact diagnostics имеет p95
+  `71.78` ms; full end-to-end replay, drops и ресурсы на стенде организатора
+  требуют отдельного замера.
 - CUDA, deskew, tracking, TTC и управление поездом не входят в MVP для сдачи.
 
 ## Что должен уметь сделать проверяющий
@@ -71,8 +73,9 @@ PointCloud2 / XYZ
 2. Подготовить локальные архивы через `scripts/prepare_hackathon_datasets.py`.
 3. Запустить direct player и посмотреть подготовленные источники.
 4. Запустить headless ROS2 demo через `scripts/run_submission_ros2_demo.ps1`.
-5. Подставить свой распакованный ROS2 bag, topic и `source_frame`.
-6. Запустить `scripts/check_submission_package.py`, чтобы проверить состав
+5. Запустить headless ROS2/C++ timing через `scripts/measure_headless_ros2_cpp_performance.py`.
+6. Подставить свой распакованный ROS2 bag, topic и `source_frame`.
+7. Запустить `scripts/check_submission_package.py`, чтобы проверить состав
    репозитория для сдачи.
 
 Эти действия описаны в [README](../README.md), [SOLUTION](../SOLUTION.md),

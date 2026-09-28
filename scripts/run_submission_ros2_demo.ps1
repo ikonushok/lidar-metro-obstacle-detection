@@ -12,6 +12,8 @@ param(
     [int]$ReadAheadQueueSize = 20,
     [ValidateRange(1, 231)]
     [int]$RosDomainId = 172,
+    [ValidateSet('full', 'summary')]
+    [string]$DiagnosticsDetail = 'full',
     [switch]$BuildImage,
     [switch]$StopExisting,
     [switch]$Play
@@ -60,11 +62,12 @@ if ($BuildImage -or $LASTEXITCODE -ne 0) {
     -p rail_selection_method:=development_candidate `
     -p rail_forward_min_m:=2.0 `
     -p forward_extension_method:=tangent `
-    -p noise_filter_mode:=baseline_v3
+    -p noise_filter_mode:=baseline_v3 `
+    -p diagnostics_detail:=$DiagnosticsDetail
 if ($LASTEXITCODE -ne 0) { throw 'Detector container failed to start.' }
 
 Write-Output "Detector started: $ContainerName"
-Write-Output "Runtime: baseline_v3, development_candidate, tangent, source_frame=$SourceFrame, input_topic=$InputTopic"
+Write-Output "Runtime: baseline_v3, development_candidate, tangent, diagnostics_detail=$DiagnosticsDetail, source_frame=$SourceFrame, input_topic=$InputTopic"
 Write-Output "Inspect recording:"
 Write-Output "  docker exec -it $ContainerName /ros_entrypoint.sh ros2 bag info /data"
 Write-Output "Read detector JSON:"

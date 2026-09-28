@@ -4,6 +4,12 @@
 
 Цель: открыть браузерный плеер со всеми текущими source IDs без ручной перекладки файлов. Алгоритм не дообучается и не меняется: это только подготовка локальных данных, сборка Docker-образа и запуск HTTP-плеера.
 
+Для хакатонной проверки без браузера основной маршрут описан в разделе
+[Headless ROS2 demo без браузера](#7-headless-ros2-demo-без-браузера):
+`ros2 bag play -> curve_envelope_node -> std_msgs/String JSON`. Браузерный
+плеер остаётся демонстрационным viewer для просмотра сцен и объяснения
+результатов.
+
 ## 1. Положить сырые датасеты
 
 Из корня проекта создайте каталог:
@@ -128,6 +134,28 @@ python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
 `--read-ahead-queue-size 20`: это проверенный demo-режим для большого
 записи `doubleT_obstacle` на Windows/Docker bind mount. `--rate 1.0` использовать
 только как отдельную throughput-проверку с фиксацией starvation/drops/ресурсов.
+
+Для воспроизводимого замера быстродействия без browser/HTTP player запустите
+detector container в compact diagnostics и выполните:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 `
+  -StopExisting `
+  -Rate 1.0 `
+  -ReadAheadQueueSize 20 `
+  -DiagnosticsDetail summary
+
+python .\scripts\measure_headless_ros2_cpp_performance.py `
+  --rate 1.0 `
+  --read-ahead-queue-size 20 `
+  --expected-messages 201 `
+  --collector-timeout-seconds 210 `
+  --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
+```
+
+Скрипт сам запускает `ros2 bag play /data`, слушает JSON-выход detector node,
+считает p50/p95/p99/max по `processing_ms`, снимает `docker stats` и пишет
+артефакты в `artefacts/current_model_validation/`.
 
 ## Ограничения демо
 

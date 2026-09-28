@@ -8,6 +8,22 @@ pipeline`: geometry-first gate, boundary warning и temporal model-assist тол
 для слабых/неочевидных случаев. Финальная модель описана как единая
 `baseline_v3` runtime policy.
 
+## 0. Хакатонные приоритеты перед отправкой
+
+Этот раздел отделяет пункты, которые могут повлиять на баллы при проверке
+хакатонного решения, от production-долга вроде полной калибровки, `/tf`, IMU,
+сертификации и safety case.
+
+| Приоритет | Что проверить или подготовить | Статус/ответственный |
+|---|---|---|
+| P0 | Ссылки в личном кабинете: репозиторий, документация, презентация, прототип или скринкаст, дополнительные материалы. | Доступ к репозиторию открывается отдельно владельцем; остальные ссылки сверить перед отправкой. |
+| P0 | README/SOLUTION доступны из корня и объясняют локальный запуск, Docker/ROS2 route, алгоритм, результаты и ограничения. | В репозитории есть `README.md` и `SOLUTION.md`; перед сдачей проверить ссылки из приватного окна. |
+| P0 | В Git не попали `dataset/`, `artefacts/`, `log/`, `.venv/`, `.idea/`, большие бинарники, секреты и локальные журналы. | Подтвердить `scripts/check_submission_package.py --require-clean` на финальном commit. |
+| P1 | Headless ROS2 route воспроизводим как `ros2 bag play -> curve_envelope_node -> JSON`. | Для smoke использовать `scripts/run_submission_ros2_demo.ps1`; для timing использовать `scripts/measure_headless_ros2_cpp_performance.py`. |
+| P1 | Метрики `baseline_v3` и границы их интерпретации зафиксированы. | Таблица и команда пересчёта описаны в `docs/EVALUATION_METRICS.md`; свежий пересчёт требует отдельного запуска. |
+| P1 | Разрывы к критериям жюри честно названы: FP/FN, дальность, speed/throughput, held-out split. | Сводка в `docs/reports/submission/SUBMISSION_READINESS_REPORT.md`. |
+| P2 | Презентация/демо-материалы готовы как файлы или ссылки. | Локальные PPTX: `docs/presentation/output/lidar_metro_obstacle_detection_submission_v3.pptx`; видео/кадры лежат в `docs/presentation/`. |
+
 ## 1. Репозиторий
 
 - Репозиторий содержит исходники, Dockerfile, конфиги, тесты и документацию.
@@ -88,6 +104,26 @@ ros2 bag play -> curve_envelope_node -> /stage_3/curve_envelope_candidate
 .\scripts\run_submission_ros2_demo.ps1 -BuildImage -StopExisting
 ```
 
+Замер быстродействия без browser/HTTP player выполняется в compact diagnostics:
+
+```powershell
+.\scripts\run_submission_ros2_demo.ps1 `
+  -StopExisting `
+  -Rate 1.0 `
+  -ReadAheadQueueSize 20 `
+  -DiagnosticsDetail summary
+
+python .\scripts\measure_headless_ros2_cpp_performance.py `
+  --rate 1.0 `
+  --read-ahead-queue-size 20 `
+  --expected-messages 201 `
+  --collector-timeout-seconds 210 `
+  --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
+```
+
+Скрипт сохраняет summary, JSONL сообщений, `docker stats` и log replay в
+`artefacts/current_model_validation/`.
+
 Проверяемые признаки результата:
 
 - публикуется JSON в `std_msgs/String`;
@@ -114,11 +150,12 @@ probe, а не внешний replay-bag.
 
 - GitHub repository — публичный исходный код, Dockerfile, инструкции и проверочные скрипты.
 - Документация — `SOLUTION.md` или PDF/облачный документ на его основе с архитектурой, алгоритмом и ограничениями.
-- Презентация — краткое описание задачи, подхода, demo-сценария и оставшихся рисков.
-- Прототип — ссылка на репозиторий/инструкцию или скринкаст воспроизводимого запуска.
-- Дополнительные материалы — демонстрационное видео, схемы и отдельный список ограничений.
+- Презентация — краткое описание задачи, подхода, demo-сценария и оставшихся рисков; текущий локальный файл: `docs/presentation/output/lidar_metro_obstacle_detection_submission_v3.pptx`.
+- Прототип — ссылка на репозиторий/инструкцию или скринкаст воспроизводимого запуска; если внешнего стенда нет, использовать README/quickstart + демонстрационное видео/скринкаст.
+- Дополнительные материалы — демонстрационное видео, схемы, кадры из `docs/presentation/picts/` и отдельный список ограничений.
 - `docs/reports/submission/SUBMISSION_READINESS_REPORT.md` — внутренний evidence/gap report по критериям сдачи.
 - `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md` — smoke report headless ROS2 запуска.
+- `docs/reports/submission/HEADLESS_ROS2_CPP_PERFORMANCE.md` — performance report headless ROS2/C++ запуска без плеера.
 
 ## 7. Stop-code
 
