@@ -102,6 +102,7 @@ docker compose up --build
 - [TRAIN_ENVELOPE_AND_LIMITATIONS.md](docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md) — габарит поезда и необходимые калибровки.
 - [LIDAR_SPEC.md](docs/LIDAR_SPEC.md) — характеристики лидара и ограничения входных данных.
 - [EVALUATION_METRICS.md](docs/EVALUATION_METRICS.md) — расчёт метрик `baseline_v3` и границы оценки.
+- [GENERALIZATION_ASSESSMENT.md](docs/GENERALIZATION_ASSESSMENT.md) — оценка переносимости на новый датасет, признаки переобучения и прогноз для скрытого теста.
 
 **Сдача и результаты проверок**
 
