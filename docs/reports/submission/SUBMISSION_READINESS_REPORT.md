@@ -9,13 +9,13 @@
 
 ## Evidence
 
-- `README.md`, `SOLUTION.md`, `docs/METHODOLOGY.md`.
-- `artefacts/current_model_validation/evaluation_summary.json`.
-- `artefacts/current_model_validation/direct_player_http_timing_new_data_1050_1150.json`.
-- `artefacts/current_model_validation/ros2_parity_timing.json`.
-- `artefacts/stage_5/direct_player/parity.json`.
-- `models/baseline_v3_runtime_policy.json`.
-- `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md`.
+- `README.md`, `SOLUTION.md`, `docs/METHODOLOGY.md` — публичное описание запуска, решения и метода.
+- `artefacts/current_model_validation/evaluation_summary.json` — зафиксированная runtime-сводка `baseline_v3`.
+- `artefacts/current_model_validation/direct_player_http_timing_new_data_1050_1150.json` — direct HTTP/compute timing на интервале `new_data`.
+- `artefacts/current_model_validation/ros2_parity_timing.json` — parity/timing direct и ROS2 на одном входе.
+- `artefacts/stage_5/direct_player/parity.json` — дополнительный артефакт сверки direct player.
+- `models/baseline_v3_runtime_policy.json` — версия передаваемой runtime-policy.
+- `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md` — журнал headless ROS2 smoke-проверки.
 
 ## Текущий подтверждённый срез
 

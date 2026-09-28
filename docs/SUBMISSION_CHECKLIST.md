@@ -105,15 +105,13 @@ probe, а не внешний replay-bag.
 
 Перед отправкой должны быть готовы ссылки или файлы:
 
-- GitHub repository;
-- документация: `SOLUTION.md` или PDF/облачный документ на его основе;
-- презентация;
-- прототип: ссылка на репозиторий/инструкцию или скринкаст;
-- дополнительные материалы: демонстрационное видео, схемы, список ограничений.
-- внутренний evidence/gap report:
-  `docs/reports/submission/SUBMISSION_READINESS_REPORT.md`.
-- smoke report headless ROS2:
-  `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md`.
+- GitHub repository — публичный исходный код, Dockerfile, инструкции и проверочные скрипты.
+- Документация — `SOLUTION.md` или PDF/облачный документ на его основе с архитектурой, алгоритмом и ограничениями.
+- Презентация — краткое описание задачи, подхода, demo-сценария и оставшихся рисков.
+- Прототип — ссылка на репозиторий/инструкцию или скринкаст воспроизводимого запуска.
+- Дополнительные материалы — демонстрационное видео, схемы и отдельный список ограничений.
+- `docs/reports/submission/SUBMISSION_READINESS_REPORT.md` — внутренний evidence/gap report по критериям сдачи.
+- `docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md` — smoke report headless ROS2 запуска.
 
 ## 7. Stop-code
 

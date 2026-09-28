@@ -70,6 +70,8 @@ dataset/raw/cloud_with_fake_obj
 
 Оба режима запуска используют одно C++ ядро.
 
+![Архитектура решения](assets/diagrams/solution_architecture.svg)
+
 Актуальный runtime pipeline:
 
 ```text
@@ -282,22 +284,22 @@ C++ compute p95 держится около `52` мс, а full HTTP path име�
 ## 10. Структура важных файлов
 
 ```text
-Dockerfile
-README.md
-SOLUTION.md
-scripts/prepare_hackathon_datasets.py
-scripts/run_stage_2_cpu_player.ps1
-scripts/run_submission_ros2_demo.ps1
-scripts/serve_stage_2_cpu_catalog.py
-scripts/cpu_catalog_runtime.py
-scripts/check_submission_package.py
-src/cpp/
-src/lidar_mosmetro3d_cpp/
-models/baseline_v3_runtime_policy.json
-web/
-docs/REVIEWER_QUICKSTART.md
-docs/SUBMISSION_CHECKLIST.md
-docs/reports/submission/
+Dockerfile                                      Docker/ROS2 Humble image для сборки C++ ядра и запуска demo.
+README.md                                      Основная инструкция по данным, player, ROS2 replay и ограничениям.
+SOLUTION.md                                    Описание архитектуры, алгоритма, проверок и границ решения.
+scripts/prepare_hackathon_datasets.py          Подготовка локальных архивов и распаковок bag для player/ROS2.
+scripts/run_stage_2_cpu_player.ps1             Запуск direct C++ HTTP-плеера с выбранными runtime-параметрами.
+scripts/run_submission_ros2_demo.ps1           Headless ROS2 wrapper: detector container, topic echo и bag play команды.
+scripts/serve_stage_2_cpu_catalog.py           HTTP catalog/player server для подготовленных локальных датасетов.
+scripts/cpu_catalog_runtime.py                 Python-обвязка C++ runtime для чтения источников и отдачи JSON плееру.
+scripts/check_submission_package.py            Read-only gate состава репозитория перед публичной передачей.
+src/cpp/                                       C++ ядро geometry/boundary/model-assist pipeline.
+src/lidar_mosmetro3d_cpp/                      ROS2 пакет и node `curve_envelope_node`.
+models/baseline_v3_runtime_policy.json         Версионированное описание текущей runtime-policy.
+web/                                           Статические файлы браузерного player-интерфейса.
+docs/REVIEWER_QUICKSTART.md                    Быстрый маршрут проверки для ревьюера.
+docs/SUBMISSION_CHECKLIST.md                   Чеклист подготовки публичной сдачи.
+docs/reports/submission/                       Evidence/gap отчёты по выполненным проверкам.
 ```
 
 ## 11. Вывод

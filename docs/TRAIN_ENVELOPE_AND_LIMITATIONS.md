@@ -4,6 +4,8 @@
 
 Статус: актуальные параметры `development_candidate / tangent`, 2026-09-23. [Запуск](../README.md), [методология](METHODOLOGY.md). Профиль, единицы и монтаж остаются assumed; калибровка документацией не изменяется.
 
+![Как читать габарит поезда](../assets/diagrams/train_envelope_concept.svg)
+
 В локальном сечении оси пути CORE: x=[−1,4;1,4], z=[0;3,7] м; expanded: x=[−1,9;1,9], z=[−0,5;4,2] м. Прямоугольники протягиваются вдоль наблюдаемой оси и synthetic tangent-продолжения до `rail_forward_max_m` (80 м в текущем запуске). Источник — константы `src/cpp/curve_pipeline_stream_cli.cpp` и параметры общего ядра C++ ROS node. Старый YAML ниже не управляет этими константами.
 
 Raw CORE сохраняется отдельно от reportable после model_v1. `system_status=UNKNOWN` и `safety_decision_permitted=false`; отсутствие сигнала не CLEAR. Расстояние измеряется от source origin, не от кузова/носа состава.

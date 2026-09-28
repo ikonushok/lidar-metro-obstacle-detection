@@ -175,6 +175,8 @@ INVALID/INSUFFICIENT DATA            -> DEGRADED / UNKNOWN
 
 > Проектная схема ниже включает будущие блоки. Исполняемый путь дан в разделе «Действующая реализация».
 
+![Runtime pipeline обнаружения](../assets/diagrams/methodology_runtime_pipeline.svg)
+
 Первый baseline: `PointCloud2 → quality gate → проверенный frame → ROI/envelope → фильтрация/кластеры → детекция + расстояние + diagnostics`. Следующая схема показывает расширенную архитектуру, не обязательную цепочку первого MVP. Неактивные стадии обходятся явно; отсутствие карты не запускает скрытое удаление точек.
 
 ```mermaid

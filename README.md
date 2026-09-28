@@ -15,6 +15,8 @@
 | Исследование записей | Архив bag → XYZ → прямой C++ → JSON → HTTP-плеер | Да, для просмотра |
 | Проверка заказчиком / сдача | ROS2 PointCloud2 → C++ node → ROS2 String с JSON | Нет |
 
+![Два способа проверить решение](assets/diagrams/readme_launch_paths.svg)
+
 Актуальные проверочные отчёты вынесены в [submission readiness](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) и [headless ROS2 demo](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md). Это ограниченные проверки интерфейсов и воспроизводимости, не доказательство качества на новых объектах. `UNKNOWN` и отрицательный ответ модели не означают свободный путь.
 
 Среда сдачи по [ТЗ](docs/hackathon_documentations/5.%20ДепТранспорта.pdf): **Ubuntu 22.04 + ROS 2 Humble + Docker**. Проект подготовлен для [«Лидеров цифровой трансформации»](https://i.moscow/cabinet/hackaton/lct/contest/1233bb5506bc455f86d534b3b40171f1).
@@ -260,16 +262,17 @@ docker stop lidar-detector
 
 ## Документация
 
-- [Описание решения для сдачи](SOLUTION.md).
-- [Быстрый запуск для проверяющих](docs/REVIEWER_QUICKSTART.md).
-- [Чеклист сдачи и repo-gate](docs/SUBMISSION_CHECKLIST.md).
-- [Срез готовности к критериям](docs/reports/submission/SUBMISSION_READINESS_REPORT.md).
-- [Проверка headless ROS2 запуска](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md).
-- [Подготовка локальных файлов плеера](docs/PLAYER_SETUP.md).
-- [Методология и действующий контракт](docs/METHODOLOGY.md).
-- [История работ и текущий статус](docs/DEVELOPMENT_HISTORY_AND_STATUS.md).
-- [Датасеты, наблюдения и ограничения](docs/DATASETS_AND_ASSUMPTIONS.md).
-- [Габарит и необходимые калибровки](docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md), [паспорт лидара](docs/LIDAR_SPEC.md).
+- [Описание решения для сдачи](SOLUTION.md) — архитектура, алгоритм, проверки и ограничения.
+- [Быстрый запуск для проверяющих](docs/REVIEWER_QUICKSTART.md) — короткий маршрут подготовки данных, player и ROS2 smoke.
+- [Чеклист сдачи и repo-gate](docs/SUBMISSION_CHECKLIST.md) — состав публичной передачи и обязательные проверки.
+- [Срез готовности к критериям](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) — evidence/gap report по требованиям.
+- [Проверка headless ROS2 запуска](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md) — журнал smoke-проверки ROS2 demo.
+- [Подготовка локальных файлов плеера](docs/PLAYER_SETUP.md) — viewer-assets, XML и локальные предпосылки запуска.
+- [Методология и действующий контракт](docs/METHODOLOGY.md) — метод, safety-инварианты и границы runtime.
+- [История работ и текущий статус](docs/DEVELOPMENT_HISTORY_AND_STATUS.md) — этапы, подтверждённые проверки и очередь.
+- [Датасеты, наблюдения и ограничения](docs/DATASETS_AND_ASSUMPTIONS.md) — реестр входов, выборок и допущений.
+- [Габарит и необходимые калибровки](docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md) — геометрия envelope и непроверенные калибровки.
+- [Паспорт лидара](docs/LIDAR_SPEC.md) — характеристики сенсора и ограничения входных данных.
 
 Основной маршрут чтения для проверяющего: `README.md`, `SOLUTION.md`,
 `docs/REVIEWER_QUICKSTART.md` и `docs/SUBMISSION_CHECKLIST.md`.
@@ -277,26 +280,26 @@ docker stop lidar-detector
 ## Структура репозитория
 
 ```text
-src/          C++ ядро, ROS2 пакет и Python readers для плеера
-scripts/      подготовка данных, запуск плеера, ROS2 demo и package gate
-config/       контракты, параметры и development-аннотации
-models/       версионированная JSON-модель `baseline_v3_runtime_policy.json`; runtime использует C++ реализацию
-web/          HTTP-плеер
-tests/        regression-тесты контрактов, плеера и repo-gate
-assets/       изображения README/SOLUTION и схемы решения
-dataset/      локальные архивы/распаковки, ignored
-artefacts/    локальные результаты и assets, ignored
-docs/
-  REVIEWER_QUICKSTART.md
-  SUBMISSION_CHECKLIST.md
-  PLAYER_SETUP.md
-  METHODOLOGY.md
-  DEVELOPMENT_HISTORY_AND_STATUS.md
-  DATASETS_AND_ASSUMPTIONS.md
-  TRAIN_ENVELOPE_AND_LIMITATIONS.md
-  LIDAR_SPEC.md
-  reports/submission/    отчёты и проверки
-  hackathon_documentations/instruction.md
+src/                                   C++ ядро, ROS2 пакет и Python readers для плеера.
+scripts/                               Подготовка данных, запуск плеера, ROS2 demo и package gate.
+config/                                Контракты, параметры и development-аннотации.
+models/                                Версионированная JSON-модель; runtime использует C++ реализацию.
+web/                                   Статические файлы HTTP-плеера.
+tests/                                 Regression-тесты контрактов, плеера и repo-gate.
+assets/                                Изображения README/SOLUTION и схемы решения.
+dataset/                               Локальные архивы/распаковки, ignored.
+artefacts/                             Локальные результаты и assets, ignored.
+docs/                                  Основная документация, методология и отчёты.
+  REVIEWER_QUICKSTART.md               Короткий сценарий запуска для проверяющего.
+  SUBMISSION_CHECKLIST.md              Чеклист состава репозитория, данных, demo и stop-code.
+  PLAYER_SETUP.md                      Однократная подготовка viewer-assets и локального окружения плеера.
+  METHODOLOGY.md                       Метод, контракты, ограничения и будущие расширения pipeline.
+  DEVELOPMENT_HISTORY_AND_STATUS.md    История этапов, текущий статус и границы подтверждений.
+  DATASETS_AND_ASSUMPTIONS.md          Реестр датасетов, наблюдений, выборок и открытых вопросов.
+  TRAIN_ENVELOPE_AND_LIMITATIONS.md    Габарит поезда, допущения и необходимые калибровки.
+  LIDAR_SPEC.md                        Паспорт лидара и входные характеристики.
+  reports/submission/                  Evidence/gap отчёты по проверкам перед передачей.
+  hackathon_documentations/instruction.md  Условия и поля сдачи из материалов хакатона.
 ```
 
 ## Лицензия
