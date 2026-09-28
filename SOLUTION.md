@@ -150,8 +150,10 @@ noise_filter_mode     = baseline_v3
 python .\scripts\prepare_hackathon_datasets.py
 ```
 
-Скрипт не добавляет данные в Git. Он готовит локальные ignored-пути для
-плеера и, при необходимости, распаковки для ROS2 replay.
+Если локальный `python` не доступен в `PATH`, используйте установленный
+интерпретатор проекта или запустите тот же скрипт внутри Docker/Compose.
+Скрипт не добавляет данные в Git. Он готовит локальные ignored-пути для плеера
+и, при необходимости, распаковки для ROS2 replay.
 
 ### 7.2. Собрать Docker image
 
@@ -182,18 +184,17 @@ http://localhost:8100/
 проезд `new_data`, synthetic fake-object dataset и development-сцену
 `doubleT_obstacle`.
 
-Оранжевое «Возможное препятствие на XX м» — экспериментальный предварительный
-сигнал: C++ нашёл группу точек подходящей формы внутри габарита, и плеер
-показал её после трёх подряд кадров с кандидатом. Он не сопоставляет объекты
-между этими кадрами; `status` может оставаться `UNKNOWN`. Красное
-«Препятствие на XX м» и красные точки соответствуют основному C++ решению
-`intrusion_candidate_present=true`. Это не гарантия физического препятствия:
-47 красных кадров на `new_data` считаются FP по сообщению пользователя, что
-в записи препятствий нет; плеер на этом источнике пишет «Ложная тревога».
-Максимальное задетектированное расстояние для оранжевого предупреждения в
-доступных пользовательских positive-окнах плеера — `68.069 м` от source LiDAR
-origin (`cloud_with_fake_obj`, `obj01_2x2_center`, кадр `137`). На кадре `142`
-оранжевое предупреждение равно `65.708 м`.
+«Препятствие/Возможное препятствие на XX м» в плеере — public C++ detection.
+В текущем `baseline_v3` трёхкадровый ранний кандидат поднимается в
+`intrusion_candidate_present=true`, поэтому headless ROS2 JSON, evaluator и
+плеер используют один и тот же ранний результат. Это не гарантия физического
+препятствия: 47 красных кадров на `new_data` считаются FP по сообщению
+пользователя, что в записи препятствий нет; плеер на этом источнике пишет
+«Ложная тревога».
+Максимальное задетектированное расстояние в доступных пользовательских
+positive-окнах плеера — `68.069 м` от source LiDAR origin
+(`cloud_with_fake_obj`, `obj01_2x2_center`, кадр `137`). На кадре `142`
+расстояние равно `65.708 м`.
 
 ### 7.4. Запустить headless ROS2 replay
 
@@ -287,7 +288,8 @@ python .\scripts\measure_headless_ros2_cpp_performance.py `
   --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
 ```
 
-Скрипт запускает `ros2 bag play /data`, слушает
+Если локальный `python` не доступен в `PATH`, используйте установленный
+интерпретатор проекта. Скрипт запускает `ros2 bag play /data`, слушает
 `/stage_3/curve_envelope_candidate`, считает p50/p95/p99/max по
 `processing_ms`, сохраняет `docker stats`, stdout/stderr replay и JSONL
 сообщений в `artefacts/current_model_validation/`.
@@ -301,18 +303,21 @@ python .\scripts\measure_headless_ros2_cpp_performance.py `
 | Direct player на локальных подготовленных архивах | PASS |
 | `/datasets.json` в плеере | 8 source ID |
 | `cloud_with_fake_obj` manifest | `frame_count=1510`, `runtime_transport=direct_cpp` |
-| `doubleT_obstacle` frames 13-14 | frame 13 — model-assist candidate waiting; frame 14 — temporal-confirmed candidate, дистанция около `55.568` м |
+| `doubleT_obstacle` frames 13-14 | frame 13 — model-assist candidate waiting; frame 14 — temporal-confirmed candidate, дистанция около `55.580` м |
 | Зафиксированная оценка `baseline_v3` | real frame runtime: `TP=51`, `FN=1`, `FP alarm=50`, `UNKNOWN=13658`; `cloud_with_fake_obj`: `6/6` positive events, `0` boundary FP |
 | Direct player HTTP timing `new_data` 1050-1150 | processing p95 `52.25` ms; HTTP wall p95 `133.16` ms; HTTP wall p99 `1932.03` ms |
 | ROS2 parity/timing `doubleT_obstacle` | PASS, `201` cases, wall `137.557` s |
 | Headless ROS2 wrapper smoke | PASS: `run_submission_ros2_demo.ps1`, `ros2 topic echo --once` получил JSON с `runtime_transport=ros2`, `noise_filter_mode=baseline_v3`, `safety_decision_permitted=false` |
 | Headless ROS2 C++ performance без плеера, `doubleT_obstacle`, `--rate 1.0`, `diagnostics_detail=summary` | `187/201` JSON, `processing_ms` p95 `71.78` ms, p99 `73.40` ms, max `74.96` ms; `Message queue starved`, Docker CPU max `146.06%`, RAM max `929.1` MiB |
 
-Docker image, зафиксированный в проверке:
+Docker image, зафиксированный в performance-проверке:
 
 ```text
 sha256:e292698a910bd605d75f571f89f5c10fedb499e6a3259cedf418fcddb001e4be
 ```
+
+Более ранний ROS2 smoke report был выполнен на образе
+`sha256:9686850054da221452d9fe0ee65ed4932ad78581274fc947865d8bfa9e7e0ec1`.
 
 Свежий ROS2-прогон подтверждает parity/integration в Docker/Humble. После
 оптимизации C++ detector path в compact production/perf режиме имеет
