@@ -51,9 +51,29 @@ docker compose up --build
 
 ## Документация
 
-- [SOLUTION.md](SOLUTION.md) — архитектура, алгоритм, результат и ограничения.
-- [REVIEWER_QUICKSTART.md](docs/REVIEWER_QUICKSTART.md) — подготовка данных, ручной запуск, API и ROS2 demo.
-- [METHODOLOGY.md](docs/METHODOLOGY.md) — метод и контракты `baseline_v3`.
-- [SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) — состав и проверки перед сдачей.
+**Запуск и решение**
+
+- [SOLUTION.md](SOLUTION.md) — устройство решения, алгоритм, запуск и ограничения.
+- [REVIEWER_QUICKSTART.md](docs/REVIEWER_QUICKSTART.md) — подготовка архивов, плеер, проверка API и ROS2-демо.
+- [PLAYER_SETUP.md](docs/PLAYER_SETUP.md) — ручная подготовка файлов плеера для PowerShell launcher.
+
+**Метод, данные и оценка**
+
+- [METHODOLOGY.md](docs/METHODOLOGY.md) — действующий метод, контракты и границы будущих расширений.
+- [DATASETS_AND_ASSUMPTIONS.md](docs/DATASETS_AND_ASSUMPTIONS.md) — состав данных, проверенные наблюдения и допущения.
+- [TRAIN_ENVELOPE_AND_LIMITATIONS.md](docs/TRAIN_ENVELOPE_AND_LIMITATIONS.md) — габарит поезда и необходимые калибровки.
+- [LIDAR_SPEC.md](docs/LIDAR_SPEC.md) — характеристики лидара и ограничения входных данных.
+- [EVALUATION_METRICS.md](docs/EVALUATION_METRICS.md) — расчёт метрик `baseline_v3` и границы оценки.
+
+**Сдача и результаты проверок**
+
+- [SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) — состав передачи и проверки перед сдачей.
+- [DEVELOPMENT_HISTORY_AND_STATUS.md](docs/DEVELOPMENT_HISTORY_AND_STATUS.md) — выполненные этапы, текущий статус и оставшиеся задачи.
+- [SUBMISSION_READINESS_REPORT.md](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) — подтверждённые результаты и пробелы к критериям сдачи.
+- [ROS2_HEADLESS_DEMO_VERIFICATION.md](docs/reports/submission/ROS2_HEADLESS_DEMO_VERIFICATION.md) — журнал проверки ROS2-демо без браузера.
+- [Техническое задание](docs/hackathon_documentations/5.%20ДепТранспорта.pdf) — требования заказчика к решению и среде запуска.
+- [Инструкция по сдаче](docs/hackathon_documentations/instruction.md) — правила передачи материалов и стоп-кода.
+
+[Иллюстрации для презентации](docs/presentation/picts/) хранятся отдельно от инструкций и отчётов.
 
 Лицензия: [MIT](LICENSE).
