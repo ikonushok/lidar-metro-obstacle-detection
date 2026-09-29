@@ -49,7 +49,7 @@
     body:has(.image-viewer[open]) { overflow: hidden; }
     .media, video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: contain; background: #080b10; border: 1px solid var(--line); border-radius: 6px; }
     .accent { color: var(--rail); } .warn { color: var(--warn); } .danger { color: var(--danger); } .ok { color: var(--ok); }
-    .diagram-view { width: 100%; height: 1060px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+    .diagram-view { width: 100%; height: 1060px; border: 1px solid var(--line); border-radius: 8px; background: #000; }
     .diagram-link { justify-self: end; font-size: 14px; }
     .pipeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; counter-reset: stage; }
     .step, .metric, .claim, .limit, .decision { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
@@ -166,7 +166,7 @@
         <div class="topline">Архитектура pipeline</div>
         <h2>От облака точек до предупреждения</h2>
       </div>
-      <iframe class="diagram-view" src="pipeline.html" title="Интерактивная схема габарита поезда и ограничений" loading="lazy" allow="fullscreen" allowfullscreen></iframe>
+      <iframe class="diagram-view" src="pipeline.html" title="Интерактивный pipeline принятия решения baseline_v3" loading="lazy" allow="fullscreen" allowfullscreen></iframe>
       <a class="diagram-link" href="pipeline.html" target="_blank" rel="noopener">Открыть схему отдельно &#8599;</a>
       <div class="pipeline" aria-label="Пайплайн обработки">
         <div class="step"><strong>PointCloud2 / XYZ</strong><span>входное 3D-облако</span></div>
