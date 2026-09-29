@@ -79,17 +79,24 @@ production/perf режиме и затем выполните измерител
 
 ```powershell
 .\scripts\run_submission_ros2_demo.ps1 `
-  -StopExisting -Rate 1.0 -ReadAheadQueueSize 20 -DiagnosticsDetail summary
+  -StopExisting -Rate 1.0 -ReadAheadQueueSize 256 -DiagnosticsDetail summary
 
 py -3 .\scripts\measure_headless_ros2_cpp_performance.py `
-  --rate 1.0 --read-ahead-queue-size 20 --expected-messages 201 `
-  --collector-timeout-seconds 210 `
-  --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
+  --rate 1.0 --read-ahead-queue-size 256 --expected-messages 201 `
+  --collector-timeout-seconds 360 `
+  --output-stem headless_ros2_cpp_performance_rate_1p0_queue256_summary_diagnostics
 ```
 
 Скрипт запускает `ros2 bag play` на паузе, дожидается заполнения очереди,
 публикует первый кадр и возобновляет запись. Затем собирает выходные JSON, `processing_ms`,
 `docker stats` и сохраняет артефакты в `artefacts/current_model_validation/`.
+Очередь `256` вмещает целиком две проверенные короткие записи: `doubleT_obstacle`
+(201 сообщение) и `roundT_doubleT` (252). Это устраняет starvation при replay
+этих записей через медленный Windows bind mount. Для `doubleT_obstacle`
+предварительная загрузка в проверке занимала около двух минут, а пик памяти
+контейнера — около **5,2 ГиБ**; у Docker должен оставаться запас памяти для
+остальных процессов. Для произвольного большого bag размер очереди выбирайте
+с учётом размера облаков и доступной памяти; `256` не гарантирует его загрузку целиком.
 Перед завершением player используется `--wait-for-all-acked 5000` (до 5 секунд,
 для RELIABLE publisher). QoS подписки детектора остаётся BEST_EFFORT;
 это ожидание само по себе не гарантирует доставку каждого кадра.
@@ -114,7 +121,7 @@ replay/collector измеритель возвращает ненулевой к
 New-Item -ItemType Directory -Force artefacts/current_model_validation | Out-Null
 docker exec lidar-detector /ros_entrypoint.sh python3 `
   /app/scripts/headless_ros2_perf_collector.py `
-  /stage_3/curve_envelope_candidate 201 300 `
+  /stage_3/curve_envelope_candidate 201 360 `
   > artefacts/current_model_validation/replay_complete.json
 ```
 
@@ -122,7 +129,8 @@ docker exec lidar-detector /ros_entrypoint.sh python3 `
 
 ```powershell
 docker exec lidar-detector /ros_entrypoint.sh ros2 bag play /data `
-  --rate 1.0 --read-ahead-queue-size 20 --start-paused --disable-keyboard-controls
+  --rate 1.0 --read-ahead-queue-size 256 --start-paused `
+  --disable-keyboard-controls --wait-for-all-acked 5000
 ```
 
 В третьем терминале выполните обе команды. `play_next` дожидается готовности
@@ -137,7 +145,7 @@ docker exec lidar-detector /ros_entrypoint.sh ros2 service call `
 
 После завершения сборщика проверьте `summary.received_messages` в
 `replay_complete.json`: оно должно совпадать с числом сообщений bag. Тайм-аут
-`300` задаётся в секундах и должен покрывать ожидание старта и весь replay.
+`360` задаётся в секундах и должен покрывать ожидание старта и весь replay.
 Время collector включает подготовительную паузу и не является FPS детектора.
 Медленное чтение через Windows bind mount всё ещё может замедлять replay;
 полная доставка сама по себе не доказывает real-time.
@@ -177,7 +185,7 @@ docker compose up --build
 
 - Выход: кандидат препятствия, ближайшее расстояние от начала координат исходного облака, статус и diagnostics.
 - `UNKNOWN` и отсутствие кандидата **не означают свободный путь**. Решение не выдаёт разрешение движения.
-- Проверка 2026-09-29: штатный headless ROS2/C++ измеритель в `diagnostics_detail=summary` получил `252/252` на `roundT_doubleT` и `201/201` на `doubleT_obstacle`, с точным исходным порядком. На успешном obstacle-проходе `processing_ms` p95 `72.21` ms, max `74.99` ms. Повтор obstacle дал `200/201`: отсутствует последний кадр. Измеритель сохранил частичный отчёт по тайм-ауту и вернул ошибку. Стабильная полная доставка пока не подтверждена; Windows bind mount вызывает `Message queue starved`. Полный end-to-end real-time на целевом Ubuntu-стенде не заявлен.
+- Проверка 2026-09-29: штатный headless ROS2/C++ измеритель в `diagnostics_detail=summary`, с очередью `256` и тайм-аутом `360` секунд получил `201/201` на `doubleT_obstacle` в двух прогонах и `252/252` на `roundT_doubleT`. Включая параллельную проверку обеих записей: точный порядок, без пропусков и starvation. В первом obstacle-проходе `processing_ms` p95 `75.85` ms, max `78.20` ms. При очереди `20` воспроизводилась потеря последнего кадра между отправкой player и получением детектором; внутренние трассы подтвердили `201` отправку и `200` получений. Контрольный режим с полной предварительной загрузкой проверен на этих записях; универсальная гарантия доставки BEST_EFFORT и полный end-to-end real-time на целевом Ubuntu-стенде не заявлены.
 - Монтаж лидара, физический габарит и качество на независимых положительных проездах не подтверждены. `80 м` — граница поиска, а не измеренная дальность обнаружения.
 - Это хакатонный прототип, не сертифицированная система управления поездом. [Текущие проверки и пробелы](docs/reports/submission/SUBMISSION_READINESS_REPORT.md) приведены отдельно.
 
