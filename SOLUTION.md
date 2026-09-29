@@ -130,6 +130,8 @@ noise_filter_mode     = baseline_v3
 
 ## 6. Визуальный пример
 
+Видео обнаружения препятствий и работы плеера доступны [в папке на Google Drive](https://drive.google.com/drive/folders/1faIDjvqWk145uFcsPRrAioY53D9uxXmo?usp=sharing).
+
 Кадры ниже взяты из локального player-сценария.
 
 ![Облако тоннеля](docs/presentation/picts/reference_01_tunnel.png)

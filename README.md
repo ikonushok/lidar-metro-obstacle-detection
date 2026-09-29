@@ -6,6 +6,8 @@
 
 Демонстрационный прототип обнаружения препятствий в тоннеле метро по облакам 3D-лидара.
 
+Видео обнаружения препятствий и работы плеера доступны [в папке на Google Drive](https://drive.google.com/drive/folders/1faIDjvqWk145uFcsPRrAioY53D9uxXmo?usp=sharing).
+
 [![Architecture: interactive diagram](https://img.shields.io/badge/architecture-interactive%20diagram-0891b2)](https://ikonushok.github.io/lidar-metro-obstacle-detection/diagrams/runtime-architecture.html)
 
 [**Открыть интерактивную схему архитектуры →**](https://ikonushok.github.io/lidar-metro-obstacle-detection/diagrams/runtime-architecture.html) Масштабирование, темы и просмотр связей между компонентами. Схема показывает оба способа запуска и общую C++ реализацию.
