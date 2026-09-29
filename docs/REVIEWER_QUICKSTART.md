@@ -132,35 +132,109 @@ python .\scripts\prepare_hackathon_datasets.py --extract doubleT_obstacle
 том же окне можно добавить `-Play`; для демонстрации JSON-выхода удобнее
 оставить replay отдельной командой и параллельно открыть `topic echo`.
 
-По умолчанию wrapper печатает replay-команду с `--rate 0.2` и
-`--read-ahead-queue-size 20`: это проверенный demo-режим для большого
-записи `doubleT_obstacle` на Windows/Docker bind mount. `--rate 1.0` использовать
-только как отдельную throughput-проверку с фиксацией starvation/drops/ресурсов.
+## 8. Подготовка данных для измерений
 
-Для воспроизводимого замера быстродействия без browser/HTTP player запустите
-detector container в compact diagnostics и выполните:
+Следующие замеры используют записи организаторов, а не произвольный bag из
+примера запуска на своих данных. Положите три архива `for_hackathon`, `new_data` и
+`cloud_with_fake_obj` в `dataset/raw/`; допускаются также `.tar`, `.zst` и
+`.tar.zst`. Подготовьте каталог TAR и распакуйте `doubleT_obstacle` внутри Docker:
+
+```powershell
+docker build -t lidar-metro-obstacle-detection:submission .
+docker run --rm --mount "type=bind,source=$PWD,target=/workspace" `
+  --workdir /workspace lidar-metro-obstacle-detection:submission `
+  python3 scripts/prepare_hackathon_datasets.py --extract doubleT_obstacle
+```
+
+Результат: три TAR в `dataset/for_hackathon/` для плеера и замера дальности;
+`metadata.yaml` и `.db3` в `dataset/extracted/doubleT_obstacle/` для ROS2 replay.
+Уже подготовленные файлы используются повторно. Данные не скачиваются
+автоматически и не включаются в образ. Для проверки сборки без кеша используйте
+`docker build --no-cache -t lidar-metro-obstacle-detection:submission .`.
+
+## 9. Измерение быстродействия и дальности
+
+Для проверки быстродействия без плеера запустите detector container в компактном
+production/perf режиме и затем выполните измеритель. На Windows для измерителя
+нужен установленный Python 3.10+ с launcher `py`; сторонние Python-пакеты на
+хосте не нужны. Проверьте `py -3 --version`. Если используете виртуальное
+окружение, вместо `py -3` укажите путь к его `python.exe`.
 
 ```powershell
 .\scripts\run_submission_ros2_demo.ps1 `
-  -StopExisting `
-  -Rate 1.0 `
-  -ReadAheadQueueSize 20 `
-  -DiagnosticsDetail summary
+  -StopExisting -Rate 1.0 -ReadAheadQueueSize 256 -DiagnosticsDetail summary
 
-python .\scripts\measure_headless_ros2_cpp_performance.py `
-  --rate 1.0 `
-  --read-ahead-queue-size 20 `
-  --expected-messages 201 `
-  --collector-timeout-seconds 210 `
-  --output-stem headless_ros2_cpp_performance_rate_1p0_summary_diagnostics
+py -3 .\scripts\measure_headless_ros2_cpp_performance.py `
+  --rate 1.0 --read-ahead-queue-size 256 --expected-messages 201 `
+  --collector-timeout-seconds 360 `
+  --output-stem headless_ros2_cpp_performance_rate_1p0_queue256_summary_diagnostics
 ```
 
-Скрипт сам запускает `ros2 bag play /data`, слушает JSON-выход detector node,
-считает p50/p95/p99/max по `processing_ms`, снимает `docker stats` и пишет
-артефакты в `artefacts/current_model_validation/`.
+Скрипт запускает `ros2 bag play` на паузе, дожидается заполнения очереди,
+публикует первый кадр и возобновляет запись. Затем собирает выходные JSON, `processing_ms`,
+`docker stats` и сохраняет артефакты в `artefacts/current_model_validation/`.
+Очередь `256` вмещает целиком две проверенные короткие записи: `doubleT_obstacle`
+(201 сообщение) и `roundT_doubleT` (252). Это устраняет starvation при replay
+этих записей через медленный Windows bind mount. Для `doubleT_obstacle`
+предварительная загрузка в проверке занимала около двух минут, а пик памяти
+контейнера — около **5,2 ГиБ**; у Docker должен оставаться запас памяти для
+остальных процессов. Для произвольного большого bag размер очереди выбирайте
+с учётом размера облаков и доступной памяти; `256` не гарантирует его загрузку целиком.
+Перед завершением player используется `--wait-for-all-acked 5000` (до 5 секунд,
+для RELIABLE publisher). QoS подписки детектора остаётся BEST_EFFORT;
+это ожидание само по себе не гарантирует доставку каждого кадра.
+Этот запуск без `-RecordingPath` выбирает подготовленный `doubleT_obstacle`;
+`201` — число сообщений именно этой записи. Для другой записи задайте её путь,
+топик и frame в launcher, а фактическое число сообщений из `ros2 bag info` —
+через `--expected-messages`. При несовпадении с `received_messages` или ошибке
+replay/collector измеритель возвращает ненулевой код; при штатном тайм-ауте
+сборщика сохраняет полученные сообщения и отчёт с причиной `timeout`.
+`play_wall_seconds` включает подготовку и стартовую паузу, поэтому вычисленная
+по нему частота не является чистым FPS детектора. При повторном
+замере задайте новый `--output-stem`, чтобы сохранить предыдущие результаты.
 
-Для пересчёта расстояния до первого public detection на доступных positive-окнах
-используйте тот же Docker image:
+Для ручной диагностики можно повторить ту же последовательность с заранее
+заполненной очередью. Это отдельная проверка полноты, без `docker stats` и без
+управления collector измерителем. Детектор `lidar-detector`
+должен уже работать в режиме `summary`.
+
+В первом терминале запустите сборщик (для `doubleT_obstacle` — 201 сообщение):
+
+```powershell
+New-Item -ItemType Directory -Force artefacts/current_model_validation | Out-Null
+docker exec lidar-detector /ros_entrypoint.sh python3 `
+  /app/scripts/headless_ros2_perf_collector.py `
+  /stage_3/curve_envelope_candidate 201 360 `
+  > artefacts/current_model_validation/replay_complete.json
+```
+
+Во втором терминале запустите запись на паузе:
+
+```powershell
+docker exec lidar-detector /ros_entrypoint.sh ros2 bag play /data `
+  --rate 1.0 --read-ahead-queue-size 256 --start-paused `
+  --disable-keyboard-controls --wait-for-all-acked 5000
+```
+
+В третьем терминале выполните обе команды. `play_next` дожидается готовности
+очереди и публикует первый кадр, затем `resume` запускает оставшуюся запись:
+
+```powershell
+docker exec lidar-detector /ros_entrypoint.sh ros2 service call `
+  /rosbag2_player/play_next rosbag2_interfaces/srv/PlayNext '{}'
+docker exec lidar-detector /ros_entrypoint.sh ros2 service call `
+  /rosbag2_player/resume rosbag2_interfaces/srv/Resume '{}'
+```
+
+После завершения сборщика проверьте `summary.received_messages` в
+`replay_complete.json`: оно должно совпадать с числом сообщений bag. Тайм-аут
+`360` задаётся в секундах и должен покрывать ожидание старта и весь replay.
+Время collector включает подготовительную паузу и не является FPS детектора.
+Медленное чтение через Windows bind mount всё ещё может замедлять replay;
+полная доставка сама по себе не доказывает real-time.
+
+Для проверки дальности первого public detection на доступных positive-окнах
+используйте тот же Docker/Humble runtime:
 
 ```powershell
 docker run --rm --mount "type=bind,source=$PWD,target=/workspace" `
