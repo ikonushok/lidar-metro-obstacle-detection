@@ -177,6 +177,19 @@
         <div class="step"><strong>JSON diagnostics</strong><span>статус, расстояние, причины</span></div>
       </div>
       <div class="source">Исполняемый путь: PointCloud2 / XYZ -> observed rail pairs -> tangent train envelope -> raw CORE components -> baseline_v3 -> JSON diagnostics.</div>
+      <div>
+        <p>В текущем <code>baseline_v3</code> используется <strong>геометрическая обработка + ансамбль деревьев решений</strong>, а не одно дерево.</p>
+        <p>Порядок такой:</p>
+        <div class="image-frame">
+          <img class="media" src="picts/baseline_v3_geometry_forest_infographic.png" alt="baseline_v3: геометрическая обработка и ансамбль из 17 деревьев решений" loading="lazy" style="aspect-ratio: auto;">
+        </div>
+        <ol>
+          <li>По рельсам строится ось пути и габарит поезда.</li>
+          <li>Точки внутри габарита объединяются в компоненты; геометрические правила выделяют явные кандидаты и пограничные случаи.</li>
+          <li>Для слабых или неоднозначных компонентов подключается <strong>Random Forest Lite из 17 деревьев</strong> и подтверждение по нескольким кадрам.</li>
+        </ol>
+        <p>То есть геометрия — основа, а деревья — вспомогательная модель. Они не распознают классы «человек», «кабель» и т. п.</p>
+      </div>
     </section>
 
     <section class="slide two" id="5" data-title="Рельсы">

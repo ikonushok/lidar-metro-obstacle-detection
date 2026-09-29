@@ -36,3 +36,4 @@ __pycache__/
 .env.*
 
 /docs/stages/
+/docs/presentation/index.zip

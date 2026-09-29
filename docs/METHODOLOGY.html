@@ -1,0 +1,1295 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="source-sha256" content="d3a9a485b7013a56b476077ef91b25b0b834827c43a4bf8efbc9f9a64887dbda"><title>Методология · lidar_MosMetro3D</title>
+<style>
+:root{color-scheme:light;--ink:#203047;--muted:#607085;--line:#dbe3ec;--accent:#155e75}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:#f3f6fa;color:var(--ink);font:16px/1.75 system-ui,-apple-system,"Segoe UI",sans-serif}
+aside{position:fixed;inset:0 auto 0 0;width:290px;padding:28px 22px;overflow:auto;border-right:1px solid var(--line);background:#fff}
+aside strong{display:block;color:var(--accent);font-size:18px;margin-bottom:18px}nav a{display:block;padding:6px 0;font-size:13px;line-height:1.5}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+main{margin:32px 40px 70px 330px;max-width:1080px;padding:42px 52px;background:white;border:1px solid var(--line);border-radius:14px}h1{font-size:32px;line-height:1.25;letter-spacing:-.6px}h2{font-size:25px;line-height:1.4;margin-top:52px;border-bottom:1px solid var(--line);padding-bottom:12px}h3{font-size:20px;margin-top:32px}p{margin:16px 0}blockquote{border-left:3px solid #86b9c8;background:#f0f7f9;margin:20px 0;padding:4px 20px;color:#40576c}ul,ol{padding-left:25px}li{margin:5px 0}
+.meta{color:var(--muted);font-size:13px;border-bottom:1px solid var(--line);padding-bottom:16px}.table-scroll{overflow-x:auto;margin:24px 0}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6}th,td{border:1px solid var(--line);padding:10px 13px;vertical-align:top}th{background:#edf3f7;text-align:left}tr:nth-child(even){background:#fafbfd}img{max-width:100%;height:auto}td img{min-width:160px}code{font: .88em/1.6 Consolas,monospace;background:#edf2f6;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}pre{overflow:auto;padding:20px;background:#f2f5f8;border-radius:8px;line-height:1.6}pre code{padding:0;background:none;white-space:pre;overflow-wrap:normal}.math-block{display:block;overflow-x:auto;padding:8px 0;text-align:center}mjx-container{max-width:100%}.mermaid{background:white}hr{border:0;border-top:1px solid var(--line);margin:36px 0}
+main{overflow-wrap:anywhere}.math-inline{display:inline-block;max-width:100%;overflow-x:auto;vertical-align:middle}img[src$="solution_pipeline.png"]{display:block;width:600px;max-width:100%;margin:16px auto}.mermaid svg{width:100%;max-height:260px;height:auto}
+@media(max-width:1050px){aside{position:static;width:auto;max-height:270px;border-bottom:1px solid var(--line)}main{margin:20px;padding:28px}h1{font-size:28px}}
+@media print{aside,.meta{display:none}body{background:white;font-size:11pt}main{margin:0;max-width:none;padding:0;border:0}h2,h3{break-after:avoid}pre,blockquote,tr{break-inside:avoid}.table-scroll,.math-block{overflow:visible}a{color:inherit}html{scroll-behavior:auto}}
+</style>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},svg:{fontCache:'local'},startup:{ready(){MathJax.startup.defaultReady();MathJax.startup.promise.then(()=>{document.getElementById('math-status').textContent='Формулы загружены';});}}};</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" onerror="document.getElementById('math-status').textContent='Формулы: CDN недоступен, показан LaTeX'"></script>
+</head><body>
+<aside><strong>lidar_MosMetro3D</strong><nav aria-label="Разделы методологии"><a href="#действующая-реализация-и-актуальный-кандидат--2026-09-27">Действующая реализация и актуальный кандидат — 2026-09-27</a>
+<a href="#оглавление">Оглавление</a>
+<a href="#1-назначение-и-границы-решения">1. Назначение и границы решения</a>
+<a href="#2-формальная-постановка-задачи">2. Формальная постановка задачи</a>
+<a href="#3-общая-архитектура-и-roadmap">3. Общая архитектура и roadmap</a>
+<a href="#4-входные-данные-и-первичный-аудит">4. Входные данные и первичный аудит</a>
+<a href="#5-системы-координат-и-компенсация-движения">5. Системы координат и компенсация движения</a>
+<a href="#6-safety-envelope-и-контролируемая-область">6. Safety envelope и контролируемая область</a>
+<a href="#7-предварительная-обработка-облака">7. Предварительная обработка облака</a>
+<a href="#8-модель-штатной-геометрии-и-background-subtraction">8. Модель штатной геометрии и background subtraction</a>
+<a href="#9-редкое-оборудование-без-семантической-разметки">9. Редкое оборудование без семантической разметки</a>
+<a href="#10-distance-aware-processing">10. Distance-aware processing</a>
+<a href="#11-кластеризация-и-kd-tree">11. Кластеризация и KD-tree</a>
+<a href="#12-геометрические-и-pca-признаки">12. Геометрические и PCA-признаки</a>
+<a href="#13-временная-фильтрация-и-трекинг">13. Временная фильтрация и трекинг</a>
+<a href="#14-оценка-риска-и-логика-решения">14. Оценка риска и логика решения</a>
+<a href="#15-ros2-конвейер-и-контракты-сообщений">15. ROS2-конвейер и контракты сообщений</a>
+<a href="#16-псевдокод">16. Псевдокод</a>
+<a href="#17-калибровка-метрики-и-протокол-оценки">17. Калибровка, метрики и протокол оценки</a>
+<a href="#18-mvp-и-критерии-готовности">18. MVP и критерии готовности</a>
+<a href="#19-план-этапов">19. План этапов</a>
+<a href="#20-риски-и-fallback-стратегии">20. Риски и fallback-стратегии</a>
+<a href="#21-матрица-трассируемости-метода">21. Матрица трассируемости метода</a>
+<a href="#22-ограничения-и-дальнейшее-развитие">22. Ограничения и дальнейшее развитие</a>
+<a href="#приложение-a-эскиз-параметров-конфигурации">Приложение A. Эскиз параметров конфигурации</a>
+<a href="#приложение-b-контрольные-вопросы-демонстрации">Приложение B. Контрольные вопросы демонстрации</a>
+<a href="#приложение-c-концептуальная-литература">Приложение C. Концептуальная литература</a></nav></aside>
+<main><div class="meta">Сформировано из <a href="METHODOLOGY.md">METHODOLOGY.md</a> · <a href="javascript:window.print()">Печать / PDF</a><br>Формулы и Mermaid требуют интернета. <span id="math-status" role="status">Загрузка формул…</span><noscript> Для формул и схем включите JavaScript.</noscript></div><h1 id="методология-обнаружения-посторонних-объектов-в-тоннеле-метро-по-данным-3dлидара">Методология обнаружения посторонних объектов в тоннеле метро по данным 3D‑лидара</h1>
+<blockquote>
+<p>Проект: <strong>lidar_MosMetro3D</strong><br>Статус документа: методология хакатонного MVP, актуализирована 2026-09-28 под сдачный <code>baseline_v3</code> runtime<br>
+Основной принцип: обнаруживать не семантический класс объекта, а <strong>новую или нештатную геометрию, пересекающую контролируемый габарит движения поезда</strong>.</p>
+</blockquote>
+<p>Обязательные условия сдачи определяет <a href="hackathon_documentations/5.%20%D0%94%D0%B5%D0%BF%D0%A2%D1%80%D0%B0%D0%BD%D1%81%D0%BF%D0%BE%D1%80%D1%82%D0%B0.pdf">ТЗ</a>; код, данные и результаты запусков определяют фактическую реализацию. Этот документ описывает выбранный метод, а не расширяет требования конкурса. <a href="DATASETS_AND_ASSUMPTIONS.md">Датасетный документ</a> фиксирует наблюдения по данным, <a href="DEVELOPMENT_HISTORY_AND_STATUS.md">история работ</a> — порядок и текущий статус реализации. Текущая C++ реализация и её границы описаны ниже; старые smoke-проверки не являются доказательством нынешнего детектора.</p>
+<p>Целевая среда: <strong>Ubuntu 22.04 + ROS 2 Humble + Docker</strong>. Первый MVP выдаёт наличие препятствия, ближайшее расстояние и диагностику. Разделы о карте, deskew, PCA, tracking, TTC и risk описывают расширения; их включение требует входных условий и проверки эффекта, а не обязательно для первого результата.</p>
+<h2 id="действующая-реализация-и-актуальный-кандидат--2026-09-27">Действующая реализация и актуальный кандидат — 2026-09-27</h2>
+<p>Статус: текущий исполняемый direct/ROS2 runtime использует <code>baseline_v3</code> как финальный pipeline проекта. <a href="../README.md">Запуск</a>, <a href="DEVELOPMENT_HISTORY_AND_STATUS.md">история и статус</a>, <a href="reports/submission/SUBMISSION_READINESS_REPORT.md">проверки перед передачей</a>. Позднейшие формулы описывают также возможные расширения: наличие раздела не означает выполнение стадии в runtime.</p>
+<p>Актуальный runtime pipeline — <code>baseline_v3</code>, а не отдельная ML-модель. Его логика:</p>
+<ol>
+<li>geometry-first gate проверяет физическое попадание объекта в габарит поезда;</li>
+<li>явно внутри габарита -&gt; <code>obstacle</code>;</li>
+<li>явно вне/выше габарита -&gt; boundary/warning, не <code>obstacle</code>;</li>
+<li>слабый, маленький или неочевидный случай -&gt; temporal model-assist;</li>
+<li>temporal подтверждает -&gt; <code>obstacle</code>;</li>
+<li>temporal не подтверждает -&gt; <code>UNKNOWN</code>, не <code>CLEAR</code>.</li>
+</ol>
+<p>Текущий исполняемый direct/ROS2 runtime:</p>
+<p><code>PointCloud2 / XYZ → AutoRails development_candidate → наблюдаемая ось → tangent-продолжение габарита → raw CORE → компоненты r=0,25 м → baseline_v3 geometry-first/boundary/model-assist → reportable/warning/UNKNOWN, ближайшая точка, diagnostics</code>.</p>
+<p>Плеер использует direct C++ stdin/stdout через <code>DirectDetailedCpuRuntime</code>; отдельный <code>curve_envelope_node</code> принимает PointCloud2 и публикует String/JSON без браузера. Оба вызывают общее ядро. Raw CORE и фильтрованный reportable — разные результаты; низкий singleton сохраняется в raw, но модель может подавить его сигнал. Текущие правила модели, включая пороги, описаны в документе модели, а не в псевдокоде будущих стадий.</p>
+<p>Ранний C++ признак <code>experimental_early_frame_candidate_present</code> означает, что группа точек подходящей формы находится внутри габарита. В текущем <code>baseline_v3</code> три подряд кадра с этим признаком поднимаются в public <code>intrusion_candidate_present=true</code>, поэтому direct player, ROS2 JSON и evaluator видят один и тот же ранний результат. Это всё ещё candidate-only предупреждение, а не доказательство физического препятствия или safety-clear: 47 красных кадров на <code>new_data</code> считаются FP по сообщению пользователя об отсутствии препятствий. На этом источнике плеер пишет «Ложная тревога».</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Блок</th>
+<th>Статус в текущем запуске</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Чтение PointCloud2/конечных ненулевых XYZ</td>
+<td>Реализовано; source frame/header сохраняются; физическая калибровка остаётся assumed</td>
+</tr>
+<tr>
+<td>Рельсы/габарит</td>
+<td>C++ локальная цепочка наблюдаемых пар + synthetic tangent, fmin=2, fmax=80; <a href="TRAIN_ENVELOPE_AND_LIMITATIONS.md">сечения</a></td>
+</tr>
+<tr>
+<td>Компоненты/модель</td>
+<td>Runtime: связность 0,25 м и <code>baseline_v3</code> как geometry-first + boundary/warning + temporal-assist policy; внутренний слабый score входит в <code>baseline_v3</code>; не PCA/нейросеть и не семантические классы</td>
+</tr>
+<tr>
+<td>Выход</td>
+<td><code>intrusion_candidate_present</code>, <code>nearest_reportable_intrusion_distance_from_source_origin_m</code>, raw/reportable/noise, status; <code>system_status=UNKNOWN</code>, safety=false</td>
+</tr>
+<tr>
+<td>Deskew/TF преобразование/фон/карта</td>
+<td>Не выполняются текущей покадровой цепочкой; необходимые входы/доказательства для включения описаны ниже</td>
+</tr>
+<tr>
+<td>Distance-aware grouping/PCA/tracking/TTC/risk</td>
+<td>Проектные расширения; в текущий <code>baseline_v3</code> runtime не входят, кроме узкого temporal-assist для слабых/неочевидных случаев</td>
+</tr>
+<tr>
+<td>Arc/CUDA/синтетика/движение</td>
+<td>Отдельные эксперименты; не активны в default tangent/baseline_v3 runtime</td>
+</tr>
+</tbody></table></div>
+<p>Дистанция — до ближайшей reportable точки от source origin, не от носа поезда. Продолжение до 80 м не доказывает detection range. Независимый положительный test отсутствует; 13–64 — принятое development-событие. Геометрия assumed; отрицательный ответ модели и UNKNOWN не CLEAR.</p>
+<h3 id="демонстрационная-последовательность-для-презентации">Демонстрационная последовательность для презентации</h3>
+<p>Для презентационного ролика пайплайн показывается слоями, в том же порядке, что и действующая цепочка выше. Эти материалы являются визуальным объяснением метода: они не меняют runtime, не публикуют <code>CLEAR/NO_OBSTACLE</code> и не являются safety-доказательством.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Шаг</th>
+<th>Что показывается</th>
+<th>Референс</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Тоннель: только исходное облако точек</td>
+<td><img src="presentation/picts/reference_01_tunnel.png" alt=""></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Рельсы, наблюдаемая ось, расстояния и направляющие</td>
+<td><img src="presentation/picts/reference_02_rails_axis.png" alt=""></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Габарит поезда до 80 м поверх оси пути</td>
+<td><img src="presentation/picts/reference_03_train_envelope.png" alt=""></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Точки в предупредительном слое <code>габарит + 0,5 м</code></td>
+<td><img src="presentation/picts/reference_04_warning_margin.png" alt=""></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Пример препятствия в <code>doubleT_obstacle</code> с ближайшей дистанцией</td>
+<td><img src="presentation/picts/reference_05_obstacle.png" alt=""></td>
+</tr>
+</tbody></table></div>
+<p>Дополнительные ракурсы для проверки читаемости: <a href="presentation/picts/reference_03_envelope_sparse.png">sparse envelope</a>, <a href="presentation/picts/reference_04_warning_margin_alt.png">warning margin alt</a>. Сгенерированные 5-секундные MP4 для этой последовательности лежат в <code>docs/presentation/movies/</code>.</p>
+<h2 id="оглавление">Оглавление</h2>
+<ol>
+<li><a href="#1-%D0%BD%D0%B0%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B8-%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%86%D1%8B-%D1%80%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D1%8F">Назначение и границы решения</a></li>
+<li><a href="#2-%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D0%BB%D1%8C%D0%BD%D0%B0%D1%8F-%D0%BF%D0%BE%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0-%D0%B7%D0%B0%D0%B4%D0%B0%D1%87%D0%B8">Формальная постановка задачи</a></li>
+<li><a href="#3-%D0%BE%D0%B1%D1%89%D0%B0%D1%8F-%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0-%D0%B8-roadmap">Общая архитектура и roadmap</a></li>
+<li><a href="#4-%D0%B2%D1%85%D0%BE%D0%B4%D0%BD%D1%8B%D0%B5-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5-%D0%B8-%D0%BF%D0%B5%D1%80%D0%B2%D0%B8%D1%87%D0%BD%D1%8B%D0%B9-%D0%B0%D1%83%D0%B4%D0%B8%D1%82">Входные данные и первичный аудит</a></li>
+<li><a href="#5-%D1%81%D0%B8%D1%81%D1%82%D0%B5%D0%BC%D1%8B-%D0%BA%D0%BE%D0%BE%D1%80%D0%B4%D0%B8%D0%BD%D0%B0%D1%82-%D0%B8-%D0%BA%D0%BE%D0%BC%D0%BF%D0%B5%D0%BD%D1%81%D0%B0%D1%86%D0%B8%D1%8F-%D0%B4%D0%B2%D0%B8%D0%B6%D0%B5%D0%BD%D0%B8%D1%8F">Системы координат и компенсация движения</a></li>
+<li><a href="#6-safety-envelope-%D0%B8-%D0%BA%D0%BE%D0%BD%D1%82%D1%80%D0%BE%D0%BB%D0%B8%D1%80%D1%83%D0%B5%D0%BC%D0%B0%D1%8F-%D0%BE%D0%B1%D0%BB%D0%B0%D1%81%D1%82%D1%8C">Safety envelope и контролируемая область</a></li>
+<li><a href="#7-%D0%BF%D1%80%D0%B5%D0%B4%D0%B2%D0%B0%D1%80%D0%B8%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%B0%D1%8F-%D0%BE%D0%B1%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%BA%D0%B0-%D0%BE%D0%B1%D0%BB%D0%B0%D0%BA%D0%B0">Предварительная обработка облака</a></li>
+<li><a href="#8-%D0%BC%D0%BE%D0%B4%D0%B5%D0%BB%D1%8C-%D1%88%D1%82%D0%B0%D1%82%D0%BD%D0%BE%D0%B9-%D0%B3%D0%B5%D0%BE%D0%BC%D0%B5%D1%82%D1%80%D0%B8%D0%B8-%D0%B8-background-subtraction">Модель штатной геометрии и background subtraction</a></li>
+<li><a href="#9-%D1%80%D0%B5%D0%B4%D0%BA%D0%BE%D0%B5-%D0%BE%D0%B1%D0%BE%D1%80%D1%83%D0%B4%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B1%D0%B5%D0%B7-%D1%81%D0%B5%D0%BC%D0%B0%D0%BD%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%BE%D0%B9-%D1%80%D0%B0%D0%B7%D0%BC%D0%B5%D1%82%D0%BA%D0%B8">Редкое оборудование без семантической разметки</a></li>
+<li><a href="#10-distance-aware-processing">Distance-aware processing</a></li>
+<li><a href="#11-%D0%BA%D0%BB%D0%B0%D1%81%D1%82%D0%B5%D1%80%D0%B8%D0%B7%D0%B0%D1%86%D0%B8%D1%8F-%D0%B8-kd-tree">Кластеризация и KD-tree</a></li>
+<li><a href="#12-%D0%B3%D0%B5%D0%BE%D0%BC%D0%B5%D1%82%D1%80%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B5-%D0%B8-pca-%D0%BF%D1%80%D0%B8%D0%B7%D0%BD%D0%B0%D0%BA%D0%B8">Геометрические и PCA-признаки</a></li>
+<li><a href="#13-%D0%B2%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%B0%D1%8F-%D1%84%D0%B8%D0%BB%D1%8C%D1%82%D1%80%D0%B0%D1%86%D0%B8%D1%8F-%D0%B8-%D1%82%D1%80%D0%B5%D0%BA%D0%B8%D0%BD%D0%B3">Временная фильтрация и трекинг</a></li>
+<li><a href="#14-%D0%BE%D1%86%D0%B5%D0%BD%D0%BA%D0%B0-%D1%80%D0%B8%D1%81%D0%BA%D0%B0-%D0%B8-%D0%BB%D0%BE%D0%B3%D0%B8%D0%BA%D0%B0-%D1%80%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D1%8F">Оценка риска и логика решения</a></li>
+<li><a href="#15-ros2-%D0%BA%D0%BE%D0%BD%D0%B2%D0%B5%D0%B9%D0%B5%D1%80-%D0%B8-%D0%BA%D0%BE%D0%BD%D1%82%D1%80%D0%B0%D0%BA%D1%82%D1%8B-%D1%81%D0%BE%D0%BE%D0%B1%D1%89%D0%B5%D0%BD%D0%B8%D0%B9">ROS2-конвейер и контракты сообщений</a></li>
+<li><a href="#16-%D0%BF%D1%81%D0%B5%D0%B2%D0%B4%D0%BE%D0%BA%D0%BE%D0%B4">Псевдокод</a></li>
+<li><a href="#17-%D0%BA%D0%B0%D0%BB%D0%B8%D0%B1%D1%80%D0%BE%D0%B2%D0%BA%D0%B0-%D0%BC%D0%B5%D1%82%D1%80%D0%B8%D0%BA%D0%B8-%D0%B8-%D0%BF%D1%80%D0%BE%D1%82%D0%BE%D0%BA%D0%BE%D0%BB-%D0%BE%D1%86%D0%B5%D0%BD%D0%BA%D0%B8">Калибровка, метрики и протокол оценки</a></li>
+<li><a href="#18-mvp-%D0%B8-%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BD%D0%BE%D1%81%D1%82%D0%B8">MVP и критерии готовности</a></li>
+<li><a href="#19-%D0%BF%D0%BB%D0%B0%D0%BD-%D1%8D%D1%82%D0%B0%D0%BF%D0%BE%D0%B2">План этапов</a></li>
+<li><a href="#20-%D1%80%D0%B8%D1%81%D0%BA%D0%B8-%D0%B8-fallback-%D1%81%D1%82%D1%80%D0%B0%D1%82%D0%B5%D0%B3%D0%B8%D0%B8">Риски и fallback-стратегии</a></li>
+<li><a href="#21-%D0%BC%D0%B0%D1%82%D1%80%D0%B8%D1%86%D0%B0-%D1%82%D1%80%D0%B0%D1%81%D1%81%D0%B8%D1%80%D1%83%D0%B5%D0%BC%D0%BE%D1%81%D1%82%D0%B8-%D0%BC%D0%B5%D1%82%D0%BE%D0%B4%D0%B0">Матрица трассируемости метода</a></li>
+<li><a href="#22-%D0%BE%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D1%8F-%D0%B8-%D0%B4%D0%B0%D0%BB%D1%8C%D0%BD%D0%B5%D0%B9%D1%88%D0%B5%D0%B5-%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5">Ограничения и дальнейшее развитие</a></li>
+</ol>
+<hr>
+<h2 id="1-назначение-и-границы-решения">1. Назначение и границы решения</h2>
+<h3 id="11-цель">1.1. Цель</h3>
+<p>Первый MVP принимает последовательность сообщений 3D-лидара, работает в проверенной системе координат, выделяет контролируемый габарит и выдаёт наличие препятствия, расстояние до ближайшего и диагностический статус. Подавление штатной геометрии добавляется при подтверждённой применимости. Расширенный выход может включать:</p>
+<ul>
+<li>положение и размеры;</li>
+<li>расстояние по ходу движения;</li>
+<li>глубина пересечения с габаритом;</li>
+<li>идентификатор временного трека;</li>
+<li>достоверность геометрической детекции;</li>
+<li>уровень риска и диагностический статус.</li>
+</ul>
+<h3 id="12-что-именно-считается-препятствием">1.2. Что именно считается препятствием</h3>
+<p><strong>Определённый метод.</strong> Кандидатом на препятствие считается связная группа наблюдаемых 3D‑точек, которая одновременно:</p>
+<ol>
+<li>находится в зоне релевантной дальности перед поездом;</li>
+<li>не объясняется доверенной моделью штатной геометрии, если такая модель включена и валидна; в envelope-only этот этап отсутствует;</li>
+<li>пересекает safety envelope или лежит в заданном предупредительном слое вокруг него;</li>
+<li>проходит геометрические проверки; временная согласованность проверяется при включённом temporal-режиме.</li>
+</ol>
+<p>Система не обязана распознавать семантический класс «кабель», «шкаф», «инструмент» или «человек». Для безопасности важнее ответить на вопрос: <strong>занимает ли неизвестная геометрия пространство, необходимое поезду для безопасного движения?</strong></p>
+<h3 id="13-что-не-заявляется">1.3. Что не заявляется</h3>
+<ul>
+<li>Методология не доказывает функциональную безопасность и не заменяет сертификацию.</li>
+<li>Без реальных данных нельзя заранее назначить пороги, гарантировать дальность, полноту или задержку.</li>
+<li>Геометрический confidence не является откалиброванной вероятностью опасности, пока это не подтверждено отдельной калибровкой.</li>
+<li>Хакатонный модуль выдаёт предупреждение/оценку для интеграции; он не должен непосредственно управлять торможением без внешнего safety-контроллера.</li>
+</ul>
+<hr>
+<h2 id="2-формальная-постановка-задачи">2. Формальная постановка задачи</h2>
+<blockquote>
+<p>Формальная постановка и целевые выходы; фактические поля JSON и candidate-only статус перечислены в разделе действующей реализации.</p>
+</blockquote>
+<h3 id="21-наблюдения">2.1. Наблюдения</h3>
+<p>В момент времени <span class="math-inline">\(t\)</span> лидар формирует облако:</p>
+<p><span class="math-block">\[
+\mathcal P_t^L = \{p_{i,t}^L\}_{i=1}^{N_t},
+\qquad
+p_{i,t}^L=(x_{i,t},y_{i,t},z_{i,t},q_{i,t}).
+\]</span></p>
+<p>Здесь <span class="math-inline">\(L\)</span> — система координат лидара, <span class="math-inline">\(N_t\)</span> — число точек, координаты измеряются в метрах, а <span class="math-inline">\(q_{i,t}\)</span> обозначает доступные дополнительные поля: intensity, ring, timestamp и другие. Наличие и смысл этих полей должны быть проверены по фактическому сообщению <code>sensor_msgs/msg/PointCloud2</code>.</p>
+<p>После фильтрации и преобразования получаем облако в рабочей системе координат <span class="math-inline">\(F\)</span>:</p>
+<p><span class="math-block">\[
+\mathcal P_t^F = \{T_{F\leftarrow L}(t)\,p_{i,t}^L\}.
+\]</span></p>
+<p>Направление преобразования задано явно: <span class="math-inline">\(T_{F\leftarrow L}(t)\)</span> переводит координаты <strong>из лидара <span class="math-inline">\(L\)</span> в рабочую систему <span class="math-inline">\(F\)</span></strong>.</p>
+<h3 id="22-выход">2.2. Выход</h3>
+<p>Минимальный выход: статус детекции, расстояние до ближайшего кандидата и статус качества входа. До реализации фиксируются единицы, точка отсчёта и смысл расстояния: продольное до ближайшей наблюдаемой точки объекта либо вдоль доступной траектории. Евклидово расстояние до центра кластера нельзя молча выдавать за расстояние по пути. При отсутствии объекта или валидной геометрии расстояние помечается недоступным, не нулевым.</p>
+<p>Для расширенного режима объекта <span class="math-inline">\(j\)</span> предлагается:</p>
+<p><span class="math-block">\[
+o_{j,t} = (\mathrm{id}_{j}, c_{j,t}, b_{j,t}, d_{j,t}, g_{j,t}, v_{j,t}, s_{j,t}, \ell_{j,t}),
+\]</span></p>
+<p>где:</p>
+<ul>
+<li><span class="math-inline">\(c_{j,t}\in\mathbb R^3\)</span> — центр объекта;</li>
+<li><span class="math-inline">\(b_{j,t}\)</span> — его 3D bounding box;</li>
+<li><span class="math-inline">\(d_{j,t}\)</span> — продольное расстояние до поезда или контрольной точки;</li>
+<li><span class="math-inline">\(g_{j,t}\)</span> — мера проникновения в safety envelope;</li>
+<li><span class="math-inline">\(v_{j,t}\)</span> — оценка относительной скорости, если она наблюдаема;</li>
+<li><span class="math-inline">\(s_{j,t}\in[0,1]\)</span> — confidence геометрического детектора;</li>
+<li><span class="math-inline">\(\ell_{j,t}\)</span> — дискретный уровень риска.</li>
+</ul>
+<h3 id="23-состояние-неопределённости">2.3. Состояние неопределённости</h3>
+<p>Помимо <code>NO_OBSTACLE</code> и <code>OBSTACLE</code>, в расширенной целевой семантике обязателен статус <code>DEGRADED/UNKNOWN</code>. Он выдаётся, если невозможно надёжно интерпретировать сцену: отсутствует необходимое преобразование, устарел требуемый источник движения, не установлен габарит, нарушена синхронизация, облако пустое/повреждено или время обработки превышает допустимое. Если рабочий frame совпадает с проверенным frame лидара, отсутствие <code>/tf</code> само по себе не является отказом. При отказе карты допустим переход в отдельно проверенный envelope-only режим с явной диагностикой; без валидного fallback выдаётся <code>UNKNOWN</code>.</p>
+<p>Текущий сдачный <code>baseline_v3</code> runtime не публикует safety-решение <code>NO_OBSTACLE/CLEAR</code>: его public JSON содержит candidate/status/diagnostics, <code>system_status=UNKNOWN</code> и <code>safety_decision_permitted=false</code>. Поэтому таблица ниже задаёт целевую логику будущего полноценного статуса, а не обещает, что текущий MVP выдаёт разрешение движения.</p>
+<pre><code class="language-text">VALID DATA + no confirmed intrusion  -&gt; NO_OBSTACLE
+VALID DATA + confirmed intrusion     -&gt; OBSTACLE
+INVALID/INSUFFICIENT DATA            -&gt; DEGRADED / UNKNOWN</code></pre><p>Это предотвращает опасное отождествление «ничего не обнаружено» с «пространство доказанно свободно».</p>
+<hr>
+<h2 id="3-общая-архитектура-и-roadmap">3. Общая архитектура и roadmap</h2>
+<p>Ниже показан текущий pipeline принятия решения <code>baseline_v3</code>: та же схема, что в разделе 4.2 <a href="../SOLUTION.md#42-pipeline-принятия-решения">SOLUTION.md</a>. Расширенная roadmap-архитектура приведена отдельно после неё.</p>
+<p><a href="../assets/diagrams/solution_pipeline.png"><img src="../assets/diagrams/solution_pipeline.png" alt="Pipeline принятия решения baseline_v3" width="600"></a></p>
+<p><a href="../assets/diagrams/solution_pipeline.svg">Открыть схему в SVG</a></p>
+<p>Первый baseline: <code>PointCloud2 → quality gate → проверенный frame → ROI/envelope → фильтрация/кластеры → детекция + расстояние + diagnostics</code>. Следующая схема показывает расширенную архитектуру, не обязательную цепочку первого MVP. Deskew/TF, background, PCA, полный tracking, TTC и risk здесь обозначают направления развития; неактивные стадии обходятся явно, а отсутствие карты не запускает скрытое удаление точек.</p>
+<pre class="mermaid">flowchart LR
+    A[PointCloud2] --&gt; B[Quality gate]
+    B --&gt; C[Deskew and TF]
+    C --&gt; D[Range and ROI crop]
+    D --&gt; E[Distance-aware voxel filter]
+    E --&gt; F[Safety envelope]
+    E --&gt; G[Static tunnel model]
+    G --&gt; H[Background subtraction]
+    F --&gt; I[Envelope intersection]
+    H --&gt; I
+    I --&gt; J[KD-tree clustering]
+    J --&gt; K[Geometry and PCA features]
+    K --&gt; L[Temporal association]
+    L --&gt; M[Track confirmation]
+    M --&gt; N[Risk assessment]
+    N --&gt; O[ObstacleArray and diagnostics]</pre><p>В логике снижения ошибок разные части конвейера имеют разные роли:</p>
+<pre><code class="language-text">модель тоннеля        -&gt; гипотеза снижения FP; не включена в текущий запуск
+safety envelope       -&gt; отбрасывает геометрию вне пути поезда
+distance-aware режим  -&gt; гипотеза снижения FN; эффект требует парного эксперимента
+temporal filtering    -&gt; гипотеза снижения FP; возможны задержка/пропуски
+diagnostic gate       -&gt; не позволяет выдать ложное &quot;путь свободен&quot;</code></pre><hr>
+<h2 id="4-входные-данные-и-первичный-аудит">4. Входные данные и первичный аудит</h2>
+<blockquote>
+<p>Требования к входному аудиту; перечень необходимых проверок не является утверждением, что весь датасет прошёл их. Объёмы evidence — в DATASETS_AND_ASSUMPTIONS.</p>
+</blockquote>
+<p>Первые два дня включают Docker Humble, replay и проверку контракта данных. Состав архива и границы выборочного исследования зафиксированы в <a href="DATASETS_AND_ASSUMPTIONS.md">датасетном документе</a>: шесть bag, 2488 сообщений, только PointCloud2, без TF/IMU/одометрии и отдельных файлов разметки/калибровки.</p>
+<p>В исследованных кадрах есть два топика и два frame ID; obstacle содержит втрое больше точек. Код валидирует поля и задаёт топик параметром/remapping, не выбирает детектор по имени записи. Нулевые XYZ составляют значительную часть облаков. Часы bag и header/per-point расходятся; связь часов, оси и метрические единицы требуют подтверждения. Наблюдение большой дальности вдоль -Y не устанавливает направление движения.</p>
+<h3 id="41-обязательные-вопросы">4.1. Обязательные вопросы</h3>
+<ul>
+<li>Частота кадров и реальная задержка публикации.</li>
+<li>Модель лидара, число лучей, угловое разрешение, минимальная/максимальная дальность.</li>
+<li>Система координат, направление осей, единицы измерения.</li>
+<li>Наличие per-point timestamps и возможность deskew внутри скана.</li>
+<li>Наличие <code>/tf</code>, <code>/tf_static</code>, одометрии, IMU и их временная согласованность.</li>
+<li>Движется ли лидар вместе с поездом; известна ли его внешняя калибровка.</li>
+<li>Есть ли повторные проезды одних участков и идентификатор участка/пути.</li>
+<li>Есть ли заведомо чистые последовательности для построения background.</li>
+<li>Как представлены реальные препятствия и есть ли хотя бы event-level разметка.</li>
+<li>Есть ли слепые зоны, отражения, пыль, вода, интенсивные мультипути.</li>
+</ul>
+<h3 id="42-автоматические-проверки-каждого-кадра">4.2. Автоматические проверки каждого кадра</h3>
+<p>Для кадра вычисляются:</p>
+<ul>
+<li>корректность fields/offsets/datatype/count, endian, point_step, row_step и длины data;</li>
+<li>число конечных точек, доля <code>NaN/Inf</code> и отдельно доля нулевых XYZ; исключение невалидных нулевых возвратов сопровождается счётчиком;</li>
+<li>распределение дальности и интенсивности;</li>
+<li>возраст требуемых TF/odometry относительно согласованной временной базы, только для использующих их режимов;</li>
+<li>доля точек после ROI;</li>
+<li>пропуски кадров и скачки timestamp;</li>
+<li>время выполнения каждой стадии.</li>
+</ul>
+<p>Кадр с нарушенным контрактом не должен участвовать в обновлении фона. Он либо пропускается, либо обрабатывается в деградированном режиме.</p>
+<h3 id="43-время-и-открытые-вопросы">4.3. Время и открытые вопросы</h3>
+<p>Раздельно хранить bag timestamp, header stamp и per-point timestamp. До проверки их связи не вычислять «задержку» вычитанием разных часов и не считать облако устаревшим относительно replay <code>/clock</code> по неподтверждённому offset. Время вычислений измерять монотонными часами процесса; задержку события — в валидированной временной базе последовательности. Исходные timestamps не переписывать скрытно.</p>
+<p>У организаторов уточнить extrinsics и единицы, профиль поезда/габарит, различия <code>hesai_lidar</code>/<code>lidar_livox</code>, причину разных объёмов и длительности скана, семантику времени, разметку и интерфейс результата. Per-point timestamps есть в выборке, но источника движения для deskew в архиве нет.</p>
+<hr>
+<h2 id="5-системы-координат-и-компенсация-движения">5. Системы координат и компенсация движения</h2>
+<blockquote>
+<p>Проектный контракт преобразований и deskew. Текущий source-frame покадровый режим не выполняет deskew/накопление; переименование frame не калибровка.</p>
+</blockquote>
+<h3 id="51-рекомендуемые-frames">5.1. Рекомендуемые frames</h3>
+<pre><code class="language-text">map / tunnel_map       долговременная карта тоннеля
+        |
+      odom             локально непрерывная одометрия
+        |
+    base_link          система координат поезда
+        |
+     lidar_link        жёстко связанный лидар</code></pre><p>Это рекомендуемая структура для расширенного режима, а не TF-дерево полученных bag. Возможны три режима.</p>
+<p><strong>Режим 0 — frame лидара.</strong> Первый baseline может работать без TF при проверенных осях и заданном в этом frame габарите. Неизвестная геометрия не исправляется переименованием frame. Без подтверждения взаимного положения лидара и габарита доступны только исследовательские кандидаты, не вывод «путь свободен».</p>
+<p><strong>Режим A — <code>base_link</code>.</strong> Требует известного <code>base_link &lt;- lidar</code> преобразования. Достаточен для локального envelope и покадровой детекции. Даже короткое накопление фона из движущихся кадров требует совмещения; сами координаты поезда не делают фон статичным.</p>
+<p><strong>Режим B — <code>map/tunnel_map</code>.</strong> Нужен для сравнения с заранее накопленной картой штатной геометрии. Требует локализации и контроля её качества.</p>
+<h3 id="52-преобразование-координат">5.2. Преобразование координат</h3>
+<p>Точку переводим однородным преобразованием:</p>
+<p><span class="math-block">\[
+\bar p_{i,t}^{F}=T_{F\leftarrow L}(t)\,\bar p_{i,t}^{L},
+\qquad
+T_{F\leftarrow L}(t)=
+\begin{bmatrix}
+R(t) &amp; u(t)\\
+0 &amp; 1
+\end{bmatrix}.
+\]</span></p>
+<p>Здесь <span class="math-inline">\(R(t)\in SO(3)\)</span> — поворот, <span class="math-inline">\(u(t)\in\mathbb R^3\)</span> — перенос, а черта обозначает однородные координаты. Это определение, а не утверждение о точности доступной локализации.</p>
+<h3 id="53-deskew-движущегося-скана">5.3. Deskew движущегося скана</h3>
+<p>Если один оборот/скан строится заметное время, точки имеют разные моменты <span class="math-inline">\(t_i\)</span>. Тогда каждая точка приводится к опорному времени <span class="math-inline">\(t_0\)</span>:</p>
+<p><span class="math-block">\[
+\bar p_{i,t_0}^{L}=
+T_{L(t_0)\leftarrow L(t_i)}\,\bar p_{i,t_i}^{L}.
+\]</span></p>
+<p>Это требует времени каждой точки (либо проверенной модели его восстановления) и оценки движения, задающей преобразования между моментами скана. Наличие timestamps без движения недостаточно. В текущем наборе внешнего источника движения нет; deskew по умолчанию недоступен до отдельной проверки оценки движения. Нельзя изображать его как реализованный.</p>
+<h3 id="54-проверка-совмещения">5.4. Проверка совмещения</h3>
+<p>Качество alignment оценивается по статическим областям, не содержащим текущих кандидатов:</p>
+<p><span class="math-block">\[
+e_t = \operatorname{median}_{p\in\mathcal S_t}
+\operatorname{dist}(p,\mathcal B),
+\]</span></p>
+<p>где <span class="math-inline">\(\mathcal S_t\)</span> — точки предполагаемой статической сцены, <span class="math-inline">\(\mathcal B\)</span> — reference cloud/voxel map, а <code>dist</code> — расстояние до ближайшей фоновой точки или поверхности. Порог допустимого <span class="math-inline">\(e_t\)</span> калибруется. При превышении порога вычитание карты отключается либо становится более консервативным.</p>
+<h3 id="55-fallback-без-надёжной-локализации">5.5. Fallback без надёжной локализации</h3>
+<ol>
+<li>Ограничить обработку локальным окном в проверенном frame лидара либо <code>base_link</code> при известном преобразовании; без валидного габарита выдавать <code>UNKNOWN</code>.</li>
+<li>Использовать frame-to-frame alignment по устойчивым стенам/своду (ICP/NDT) только при измеряемой сходимости.</li>
+<li>Не обновлять долговременный background при плохом alignment.</li>
+<li>Сохранить отдельно проверенный envelope-only baseline; его наличие не является доказательством безопасности.</li>
+</ol>
+<hr>
+<h2 id="6-safety-envelope-и-контролируемая-область">6. Safety envelope и контролируемая область</h2>
+<blockquote>
+<p>Общие определения и будущий физический контракт. Фактические C++ CORE/expanded и assumed статус — в TRAIN_ENVELOPE_AND_LIMITATIONS; старый YAML не управляет direct runtime.</p>
+</blockquote>
+<h3 id="61-геометрия">6.1. Геометрия</h3>
+<p>Safety envelope <span class="math-inline">\(\mathcal E_t\subset\mathbb R^3\)</span> — объём, который должен оставаться свободным. В простейшем MVP это вытянутая призма в проверенном рабочем frame; при наличии геометрии пути — sweep профиля по прогнозируемой центральной линии. Прямой envelope ограничен участками, где его применимость проверена: кривые и стрелки требуют явного контроля траектории или ограничения валидной области.</p>
+<p>Пусть <span class="math-inline">\(\Gamma_t(s)\)</span> — центральная линия пути впереди поезда, <span class="math-inline">\(s\in[0,S]\)</span> — продольная координата, а <span class="math-inline">\(\mathcal C(s)\)</span> — допустимое поперечное сечение. Тогда:</p>
+<p><span class="math-block">\[
+\mathcal E_t =
+\bigcup_{s\in[0,S]}
+\left\{\Gamma_t(s)+R_t(s)q\;:\;q\in\mathcal C(s)\right\}.
+\]</span></p>
+<p>Здесь <span class="math-inline">\(R_t(s)\)</span> задаёт ориентацию локального сечения относительно пути. Это определение позволяет учитывать кривизну только тогда, когда <span class="math-inline">\(\Gamma_t\)</span> действительно доступна.</p>
+<h3 id="62-запас-безопасности">6.2. Запас безопасности</h3>
+<p>Контролируемая область получается расширением кинематического габарита <span class="math-inline">\(\mathcal E_t^{train}\)</span> на запас <span class="math-inline">\(m(s)\)</span>:</p>
+<p><span class="math-block">\[
+\mathcal E_t^{safe}=\mathcal E_t^{train}\oplus\mathcal M(m(s)),
+\]</span></p>
+<p>где <span class="math-inline">\(\oplus\)</span> — сумма Минковского, а <span class="math-inline">\(\mathcal M\)</span> — объём запаса. Значение <span class="math-inline">\(m(s)\)</span> не является универсальной константой: оно должно учитывать требования заказчика, погрешности калибровки/локализации, динамику поезда и нормативный габарит.</p>
+<h3 id="63-предупредительный-слой">6.3. Предупредительный слой</h3>
+<p>Полезно различать:</p>
+<ul>
+<li><code>inside</code>: объект уже пересекает safety envelope;</li>
+<li><code>margin</code>: объект находится в расширенном предупредительном слое;</li>
+<li><code>outside</code>: объект вне релевантной области.</li>
+</ul>
+<pre><code class="language-text">Поперечное сечение тоннеля
+
+ wall                                           wall
+  |                                               |
+  |       warning margin                          |
+  |     +-------------------+                     |
+  |     |  safety envelope  |   штатный кабель ===|
+  |     |       [X]         |                     |
+==+=====+===================+=====================+== rails
+        объект X требует анализа; кабель вне envelope неопасен</code></pre><h3 id="64-мера-пересечения">6.4. Мера пересечения</h3>
+<p>Для bounding box <span class="math-inline">\(B_{j,t}\)</span> определим долю его объёма внутри envelope:</p>
+<p><span class="math-block">\[
+g_{j,t}^{vol}=
+\frac{\operatorname{Vol}(B_{j,t}\cap\mathcal E_t^{safe})}
+{\max(\operatorname{Vol}(B_{j,t}),\varepsilon)}.
+\]</span></p>
+<p>Для малых, тонких или плохо восстановленных объектов объём нестабилен. Поэтому параллельно используется точечная доля:</p>
+<p><span class="math-block">\[
+g_{j,t}^{pts}=
+\frac{|\{p\in C_{j,t}:p\in\mathcal E_t^{safe}\}|}{|C_{j,t}|}.
+\]</span></p>
+<p>Практическое решение может применять максимум или консервативную комбинацию двух мер. Выбор проверяется на калибровочных данных.</p>
+<hr>
+<h2 id="7-предварительная-обработка-облака">7. Предварительная обработка облака</h2>
+<blockquote>
+<p>Проектные варианты preprocessing. В текущем пути нет автоматического удаления ground/rails из CORE; модель работает с сохранёнными raw компонентами.</p>
+</blockquote>
+<p>Рекомендуемый порядок:</p>
+<ol>
+<li>проверить схему облака; удалить нечисловые и невалидные нулевые возвраты, точки вне подтверждённого физического диапазона лидара, сохраняя счётчики;</li>
+<li>проверить timestamp и доступность transform, если он необходим выбранному режиму;</li>
+<li>выполнить deskew, если входные данные это допускают;</li>
+<li>преобразовать облако в рабочий frame;</li>
+<li>отсечь точки позади и далеко вне зоны остановочного интереса;</li>
+<li>применить distance-aware voxel downsampling;</li>
+<li>при необходимости удалить только доказанные сенсорные артефакты;</li>
+<li>сохранить диагностические счётчики после каждого фильтра.</li>
+</ol>
+<p>Недопустимо агрессивно удалять «землю» или «рельсы» общей плоскостью, если на них может лежать низкое препятствие. RANSAC допустим для оценки конкретной геометрической гипотезы, но не должен применяться лишь потому, что он перечислен в заявке.</p>
+<hr>
+<h2 id="8-модель-штатной-геометрии-и-background-subtraction">8. Модель штатной геометрии и background subtraction</h2>
+<blockquote>
+<p>Будущий дизайн. Доверенная background map и subtraction не включены в текущий запуск.</p>
+</blockquote>
+<p>Расширение после baseline, не обязательное условие первого MVP. Полученный архив не содержит готовой карты или подтверждённых чистых повторных проездов. До проверки эталона и совмещения background отключён; точки внутри envelope остаются кандидатами. Покадровая модель штатной геометрии — отдельная проверяемая гипотеза, не разрешение удалять землю/рельсы общей плоскостью.</p>
+<h3 id="81-варианты-background-модели">8.1. Варианты background-модели</h3>
+<p>В порядке роста сложности:</p>
+<ol>
+<li><strong>Reference cloud чистого проезда.</strong> Быстрее всего для MVP, но требует согласованной локализации.</li>
+<li><strong>Voxel occupancy map.</strong> Хранит частоту наблюдения занятости и видимости каждого voxel.</li>
+<li><strong>Многопроездная карта.</strong> Сохраняет устойчивую геометрию по участкам тоннеля.</li>
+<li><strong>Поверхностная/семантическая карта.</strong> Не является обязательной для 10-дневного MVP.</li>
+</ol>
+<h3 id="82-occupancy-с-учётом-видимости">8.2. Occupancy с учётом видимости</h3>
+<p>Для voxel <span class="math-inline">\(v\)</span> накапливаются два счётчика:</p>
+<p><span class="math-block">\[
+n_{occ}(v)=\sum_{k\in\mathcal K}\mathbf 1[v\text{ занят в проезде }k],
+\]</span></p>
+<p><span class="math-block">\[
+n_{vis}(v)=\sum_{k\in\mathcal K}\mathbf 1[v\text{ был наблюдаем в проезде }k].
+\]</span></p>
+<p>Оценка устойчивой занятости:</p>
+<p><span class="math-block">\[
+\hat p_{occ}(v)=
+\frac{n_{occ}(v)+\alpha}{n_{vis}(v)+\alpha+\beta}.
+\]</span></p>
+<p>Параметры <span class="math-inline">\(\alpha,\beta\)</span> задают сглаживание и должны быть задокументированы. Учитывать <code>observed</code> необходимо: отсутствие возврата луча не всегда означает свободное пространство.</p>
+<p>Voxel считается частью доверенного background только при достаточном <span class="math-inline">\(n_{vis}(v)\)</span>, высокой <span class="math-inline">\(\hat p_{occ}(v)\)</span> и подтверждении на независимых чистых проездах.</p>
+<h3 id="83-выделение-остаточных-точек">8.3. Выделение остаточных точек</h3>
+<p>Для текущей точки <span class="math-inline">\(p\)</span> вычисляется расстояние до штатной модели:</p>
+<p><span class="math-block">\[
+\delta_{bg}(p)=\min_{b\in\mathcal B}\|p-b\|_2.
+\]</span></p>
+<p>Точка становится остаточной, если:</p>
+<p><span class="math-block">\[
+p\in\mathcal R_t
+\quad\Longleftrightarrow\quad
+\delta_{bg}(p)&gt;\tau_{bg}(r(p))
+\;\land\;
+p\in\mathcal E_t^{warning}.
+\]</span></p>
+<p>Здесь <span class="math-inline">\(\tau_{bg}(r)\)</span> — калибруемый допуск, который может зависеть от дальности, углового разрешения и ошибки alignment. KD-tree подходит для nearest-neighbor запроса к reference cloud; voxel hash — для более дешёвой проверки occupancy.</p>
+<h3 id="84-защита-от-запоминания-препятствия">8.4. Защита от «запоминания» препятствия</h3>
+<p>Новая геометрия не должна быстро становиться фоном. Используются два слоя:</p>
+<pre><code class="language-text">IMMUTABLE / SLOW STATIC MAP
+  строится по чистым проездам, обновляется офлайн или после проверки
+
+SHORT-TERM OBSERVATIONS
+  служат для детекции и трекинга, но не переписывают static map</code></pre><p>Обновление static map разрешается только при всех условиях:</p>
+<ul>
+<li>последовательность признана чистой внешним процессом;</li>
+<li>нет подтверждённого intrusion;</li>
+<li>локализация и синхронизация валидны;</li>
+<li>изменение повторяется в нескольких независимых проездах;</li>
+<li>новый вариант карты проходит offline-регрессию.</li>
+</ul>
+<hr>
+<h2 id="9-редкое-оборудование-без-семантической-разметки">9. Редкое оборудование без семантической разметки</h2>
+<blockquote>
+<p>Концептуальная справка для background-расширения, не действующая политика текущего <code>baseline_v3</code> runtime.</p>
+</blockquote>
+<h3 id="91-основной-ответ">9.1. Основной ответ</h3>
+<p>Редкое штатное оборудование не требуется распознавать по классу. Оно алгоритмически отделяется по трём признакам:</p>
+<ol>
+<li><strong>пространственная стабильность</strong> — наблюдается в одном месте тоннеля после alignment;</li>
+<li><strong>повторяемость по проездам</strong> — присутствует при разных проездах и условиях;</li>
+<li><strong>отношение к envelope</strong> — большая часть кабелей, шкафов и ниш расположена вне контролируемого объёма.</li>
+</ol>
+<p>Таким образом, система учит не метку «кабель», а свойство «доверенная постоянная геометрия».</p>
+<h3 id="92-консервативные-состояния-voxel">9.2. Консервативные состояния voxel</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Unknown
+    Unknown --&gt; CandidateStatic: повторные наблюдения
+    CandidateStatic --&gt; TrustedStatic: чистые независимые проезды
+    CandidateStatic --&gt; Unknown: нестабильная геометрия
+    TrustedStatic --&gt; Changed: значимое расхождение
+    Changed --&gt; TrustedStatic: расхождение исчезло
+    Changed --&gt; Review: устойчивое расхождение
+    Review --&gt; TrustedStatic: изменение проверено и принято
+    Review --&gt; Changed: принятие отклонено</pre><p><code>Unknown</code> и <code>Changed</code> внутри envelope обрабатываются как потенциальная опасность, а не автоматически как фон.</p>
+<h3 id="93-когда-геометрия-двусмысленна">9.3. Когда геометрия двусмысленна</h3>
+<p>Тонкий кабель и ветка/прут могут иметь сходные PCA-признаки. Поэтому shape features применяются для устойчивости и приоритизации, но не как единственное основание удалить объект из списка препятствий. Внутри envelope действует консервативное правило: неизвестный устойчивый residual сохраняется кандидатом.</p>
+<hr>
+<h2 id="10-distance-aware-processing">10. Distance-aware processing</h2>
+<blockquote>
+<p>Гипотеза будущей обработки по дальности. Текущий радиус связности фиксирован; улучшение recall этим разделом не доказано.</p>
+</blockquote>
+<h3 id="101-причина">10.1. Причина</h3>
+<p>При фиксированном угловом шаге лидара линейное расстояние между соседними лучами растёт приблизительно пропорционально дальности:</p>
+<p><span class="math-block">\[
+\Delta(r)\approx r\,\Delta\theta,
+\]</span></p>
+<p>где <span class="math-inline">\(r\)</span> — дальность, <span class="math-inline">\(\Delta\theta\)</span> — угловой шаг в радианах. Это геометрическое приближение объясняет, почему фиксированный радиус кластеризации фрагментирует дальние объекты.</p>
+<h3 id="102-диапазонные-зоны">10.2. Диапазонные зоны</h3>
+<p>Для MVP дальность разбивается на зоны <span class="math-inline">\(Z_k=[r_k,r_{k+1})\)</span>. Для каждой зоны калибруются:</p>
+<ul>
+<li>размер voxel <span class="math-inline">\(h_k\)</span>;</li>
+<li>радиус соседства <span class="math-inline">\(\varepsilon_k\)</span>;</li>
+<li>минимальное число точек <span class="math-inline">\(m_k\)</span>;</li>
+<li>допуск background subtraction <span class="math-inline">\(\tau_{bg,k}\)</span>;</li>
+<li>минимальная временная поддержка.</li>
+</ul>
+<p>Вместо зон можно использовать ограниченные функции:</p>
+<p><span class="math-block">\[
+h(r)=\operatorname{clip}(h_0+a_h r, h_{min}, h_{max}),
+\]</span></p>
+<p><span class="math-block">\[
+\varepsilon(r)=\operatorname{clip}(\varepsilon_0+a_\varepsilon r,
+\varepsilon_{min},\varepsilon_{max}).
+\]</span></p>
+<p>Коэффициенты являются <strong>параметрами калибровки</strong>, а не известными физическими константами.</p>
+<h3 id="103-минимальная-поддержка-объекта">10.3. Минимальная поддержка объекта</h3>
+<p><code>min_points</code> нельзя бездумно увеличивать для дальних зон. Возможный закон:</p>
+<p><span class="math-block">\[
+m(r)=\max(m_{floor},\lfloor m_0\,w(r)\rfloor),
+\qquad 0&lt;w(r)\le1,
+\]</span></p>
+<p>где <span class="math-inline">\(w(r)\)</span> убывает с дальностью. Нижний предел <span class="math-inline">\(m_{floor}\)</span> защищает от одиночных выбросов. Уменьшение пространственной поддержки компенсируется более строгой временной проверкой.</p>
+<h3 id="104-защита-от-ложных-объединений">10.4. Защита от ложных объединений</h3>
+<p>Рост <span class="math-inline">\(\varepsilon(r)\)</span> может склеивать стену и объект. Поэтому:</p>
+<ul>
+<li>сначала применяется background subtraction и envelope crop;</li>
+<li>соседство ограничивается по радиальной/тангенциальной геометрии;</li>
+<li>вводится верхняя граница размеров кластера;</li>
+<li>результаты оцениваются отдельно по диапазонам дальности.</li>
+</ul>
+<hr>
+<h2 id="11-кластеризация-и-kd-tree">11. Кластеризация и KD-tree</h2>
+<blockquote>
+<p>Обзор методов и проектные варианты. Текущий C++ обход соседей компонент не является заявленной KD-tree/DBSCAN реализацией.</p>
+</blockquote>
+<h3 id="111-euclidean-clustering">11.1. Euclidean clustering</h3>
+<p>Для остаточных точек строится KD-tree. Две точки <span class="math-inline">\(p_i,p_j\)</span> связаны, если:</p>
+<p><span class="math-block">\[
+\|p_i-p_j\|_2\le\varepsilon(r_{ij}),
+\qquad
+r_{ij}=\frac{r(p_i)+r(p_j)}2.
+\]</span></p>
+<p>Компоненты связности образуют кластеры. Это хорошо контролируемый baseline и обычно проще DBSCAN.</p>
+<h3 id="112-dbscan">11.2. DBSCAN</h3>
+<p>DBSCAN полезен, когда нужно явно выделять шум. Однако стандартная реализация предполагает глобальные <code>eps</code> и <code>min_samples</code>. Для distance-aware режима возможны три практических варианта:</p>
+<ol>
+<li>запускать DBSCAN отдельно в диапазонных зонах с перекрытием;</li>
+<li>использовать нормализованные координаты/метрику;</li>
+<li>реализовать radius graph с переменным радиусом и извлечение компонент.</li>
+</ol>
+<p>На 10-дневном MVP предпочтительны зоны с перекрытием либо Euclidean clustering с переменным радиусом.</p>
+<h3 id="113-слияние-зон">11.3. Слияние зон</h3>
+<p>Кластеры из соседних зон объединяются, если их bounding boxes пересекаются после небольшого расширения или если расстояние между центроидами согласуется с локальной плотностью. Каждый исходный point ID должен принадлежать не более чем одному итоговому объекту.</p>
+<h3 id="114-сложность">11.4. Сложность</h3>
+<p>Построение KD-tree обычно требует порядка <span class="math-inline">\(O(N\log N)\)</span>, а запросы зависят от распределения точек и числа соседей. Реальную задержку следует измерять, а не выводить из асимптотики. Downsampling и ранний envelope crop должны уменьшить <span class="math-inline">\(N\)</span> до кластеризации.</p>
+<hr>
+<h2 id="12-геометрические-и-pca-признаки">12. Геометрические и PCA-признаки</h2>
+<blockquote>
+<p>Справка о признаках/PCA; в обучении v1 рассчитаны восемь табличных признаков, итоговое дерево использует высоту и число точек. PCA в active runtime не выполняется.</p>
+</blockquote>
+<p>Для кластера <span class="math-inline">\(C_j=\{p_i\}_{i=1}^{n_j}\)</span> вычисляется центр:</p>
+<p><span class="math-block">\[
+\mu_j=\frac1{n_j}\sum_{i=1}^{n_j}p_i,
+\]</span></p>
+<p>и ковариационная матрица:</p>
+<p><span class="math-block">\[
+\Sigma_j=\frac1{n_j}\sum_{i=1}^{n_j}(p_i-\mu_j)(p_i-\mu_j)^\top.
+\]</span></p>
+<p>Пусть <span class="math-inline">\(\lambda_1\ge\lambda_2\ge\lambda_3\ge0\)</span> — собственные значения. Тогда можно определить:</p>
+<p><span class="math-block">\[
+\text{linearity}=\frac{\lambda_1-\lambda_2}{\max(\lambda_1,\epsilon)},
+\]</span></p>
+<p><span class="math-block">\[
+\text{planarity}=\frac{\lambda_2-\lambda_3}{\max(\lambda_1,\epsilon)},
+\]</span></p>
+<p><span class="math-block">\[
+\text{scattering}=\frac{\lambda_3}{\max(\lambda_1,\epsilon)}.
+\]</span></p>
+<p>Интерпретация:</p>
+<ul>
+<li>высокая linearity — тонкая/вытянутая структура;</li>
+<li>высокая planarity — локальная поверхность;</li>
+<li>высокая scattering — объёмное распределение.</li>
+</ul>
+<p>Дополнительные признаки:</p>
+<ul>
+<li>размеры AABB/OBB и диагональ;</li>
+<li>высота над уровнем рельса;</li>
+<li>число и плотность точек с учётом дальности;</li>
+<li>устойчивость размеров и центра во времени;</li>
+<li>доля пересечения с envelope;</li>
+<li>residual distance до background;</li>
+<li>интенсивность — только после проверки её стабильности у данного лидара.</li>
+</ul>
+<p>PCA-признаки не доказывают класс объекта и не должны самостоятельно подавлять неизвестную геометрию внутри габарита.</p>
+<hr>
+<h2 id="13-временная-фильтрация-и-трекинг">13. Временная фильтрация и трекинг</h2>
+<blockquote>
+<p>Будущий дизайн tracking/TTC; текущий default <code>baseline_v3</code> использует узкий temporal model-assist только для слабых/неочевидных случаев. Полный tracking и TTC в runtime не входят.</p>
+</blockquote>
+<h3 id="131-почему-она-нужна">13.1. Почему она нужна</h3>
+<p>Одиночные точки, отражения и ошибки alignment могут существовать один кадр. Реальная физическая геометрия обычно согласована в пространстве после компенсации движения.</p>
+<h3 id="132-ассоциация">13.2. Ассоциация</h3>
+<p>Для активного трека <span class="math-inline">\(q\)</span> и нового кластера <span class="math-inline">\(j\)</span> задаётся стоимость:</p>
+<p><span class="math-block">\[
+D(q,j)=
+w_c\|\hat c_{q,t}-c_{j,t}\|_2
++w_b(1-\operatorname{IoU3D}(\hat B_{q,t},B_{j,t}))
++w_s\,\Delta_{shape}(q,j).
+\]</span></p>
+<p>Здесь <span class="math-inline">\(\hat c_{q,t}\)</span> и <span class="math-inline">\(\hat B_{q,t}\)</span> — прогноз трека, а веса и gate-пороги калибруются. Для MVP достаточно greedy/Hungarian association; сложный multi-object tracker необязателен.</p>
+<h3 id="133-подтверждение-k-of-l">13.3. Подтверждение k-of-L</h3>
+<p>Трек считается подтверждённым, если он обнаружен не менее <span class="math-inline">\(\kappa\)</span> раз за последние <span class="math-inline">\(L\)</span> кадров:</p>
+<p><span class="math-block">\[
+\operatorname{confirmed}_{q,t}=
+\mathbf 1\!\left[
+\sum_{u=\max(1,t-L+1)}^{t} z_{q,u}\ge\kappa
+\right],
+\qquad 1\le\kappa\le L.
+\]</span></p>
+<p><span class="math-inline">\(z_{q,u}=1\)</span>, если трек получил ассоциированное наблюдение. Для первых <span class="math-inline">\(L-1\)</span> кадров сумма берётся по доступной истории; критическое глубокое intrusion может публиковаться как <code>tentative_high_risk</code> до полного подтверждения, чтобы временной фильтр не создавал опасную задержку.</p>
+<h3 id="134-состояния-трека">13.4. Состояния трека</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Tentative
+    Tentative --&gt; Confirmed: k of L observations
+    Tentative --&gt; Deleted: misses exceed tentative limit
+    Confirmed --&gt; Occluded: temporary miss
+    Occluded --&gt; Confirmed: observation returns
+    Occluded --&gt; Deleted: timeout exceeded
+    Confirmed --&gt; Deleted: track exits ROI</pre><h3 id="135-скорость-и-ttc">13.5. Скорость и TTC</h3>
+<p>Если системы координат и timestamps надёжны, относительная продольная скорость оценивается по сглаженной истории <span class="math-inline">\(d_{q,t}\)</span>. Для сближения:</p>
+<p><span class="math-block">\[
+\mathrm{TTC}_{q,t}=
+\frac{d_{q,t}}{\max(-\dot d_{q,t},\epsilon)}
+\quad\text{при }\dot d_{q,t}&lt;0.
+\]</span></p>
+<p>Если скорость ненадёжна, TTC не публикуется, а риск определяется по расстоянию и intrusion. Нельзя подменять отсутствующий TTC фиктивным большим значением.</p>
+<hr>
+<h2 id="14-оценка-риска-и-логика-решения">14. Оценка риска и логика решения</h2>
+<blockquote>
+<p>Будущий дизайн risk/confidence; runtime не публикует откалиброванную вероятность аварии или разрешение движения.</p>
+</blockquote>
+<h3 id="141-разделение-confidence-и-risk">14.1. Разделение confidence и risk</h3>
+<ul>
+<li><strong>Confidence</strong> описывает качество геометрической/временной поддержки детекции.</li>
+<li><strong>Risk</strong> описывает потенциальные последствия с учётом положения относительно пути.</li>
+</ul>
+<p>Большой уверенно наблюдаемый объект вне envelope имеет высокий confidence, но низкий risk. Малый кластер глубоко внутри envelope может иметь средний confidence, но требовать консервативного предупреждения.</p>
+<h3 id="142-нормированные-компоненты">14.2. Нормированные компоненты</h3>
+<p>Пусть:</p>
+<ul>
+<li><span class="math-inline">\(G_j\in[0,1]\)</span> — нормированная глубина/доля intrusion;</li>
+<li><span class="math-inline">\(D_j\in[0,1]\)</span> — опасность по расстоянию, возрастающая при приближении;</li>
+<li><span class="math-inline">\(T_j\in[0,1]\)</span> — опасность по TTC, если он валиден;</li>
+<li><span class="math-inline">\(C_j\in[0,1]\)</span> — confidence наблюдения;</li>
+<li><span class="math-inline">\(U_j\in[0,1]\)</span> — штраф за неопределённость данных.</li>
+</ul>
+<p>Рабочий score можно определить как:</p>
+<p><span class="math-block">\[
+R_j=w_GG_j+w_DD_j+w_TT_j+w_CC_j+w_UU_j,
+\qquad \sum w_*=1,\quad w_*\ge0.
+\]</span></p>
+<p>Это <strong>определение проектного score</strong>, а не вероятность аварии. Веса и границы уровней выбираются на calibration-наборе совместно с инженером предметной области.</p>
+<h3 id="143-дискретные-решения">14.3. Дискретные решения</h3>
+<pre><code class="language-text">DEGRADED   данные или преобразования ненадёжны
+CLEAR      валидные данные, подтверждённых intrusion нет
+WATCH      кандидат в warning margin или tentative intrusion
+WARNING    подтверждённое пересечение safety envelope
+CRITICAL   глубокое/близкое пересечение либо малый валидный TTC</code></pre><p>При конфликте диагностического и детекционного статусов действует более консервативный из них; <code>DEGRADED</code> не превращается в <code>CLEAR</code>.</p>
+<hr>
+<h2 id="15-ros2-конвейер-и-контракты-сообщений">15. ROS2-конвейер и контракты сообщений</h2>
+<blockquote>
+<p>Декомпозиция и предлагаемая схема сообщения ниже — проектный вариант. Сейчас отдельный C++ node публикует std_msgs/String с JSON, direct player использует stdin/stdout.</p>
+</blockquote>
+<p>Обязательная среда — Ubuntu 22.04, ROS 2 Humble и Docker. Первый smoke-test читает обычный bag и obstacle, выводит счётчики и диагностику. Образ устанавливает зависимости автоматически; версии, конфигурация, команда replay и оборудование фиксируются. Текущие <code>.python-version</code> и Dockerfile ориентированы на Python 3.10 / Humble / Jammy; requirements перечисляет NumPy/Matplotlib, ROS-зависимости ставит образ. Свежая сборка требует отдельной runtime-проверки. CUDA допустима только как дополнительный путь и не входит в маршрут для сдачи; сведения организаторов о driver 580.173.02 и toolkit 12.9 не подтверждают NVIDIA Container Toolkit или <code>--gpus all</code>.</p>
+<h3 id="151-логическая-декомпозиция">15.1. Логическая декомпозиция</h3>
+<p>Для первого baseline достаточно подписчика, геометрического детектора, минимального результата и diagnostics. Схема ниже описывает расширения; <code>/lidar/points</code> — логическое имя, вход задаётся remapping на фактический топик. TF/odometry, background, tracks и risk не обязательны для локальной покадровой ветки.</p>
+<pre class="mermaid">flowchart TD
+    PC[/lidar/points/] --&gt; PRE[cloud_preprocessor]
+    TF[/tf and odometry/] --&gt; PRE
+    PRE --&gt; ALIGNED[/perception/points_aligned/]
+    ALIGNED --&gt; BG[background_subtractor]
+    MAP[(tunnel map)] --&gt; BG
+    ALIGNED --&gt; ENV[envelope_filter]
+    BG --&gt; CAND[/perception/residual_points/]
+    ENV --&gt; CAND
+    CAND --&gt; CL[cluster_detector]
+    CL --&gt; DET[/perception/detections/]
+    DET --&gt; TRK[temporal_tracker]
+    TRK --&gt; TRACKS[/perception/tracks/]
+    TRACKS --&gt; RISK[risk_assessor]
+    RISK --&gt; OBS[/perception/obstacles/]
+    PRE --&gt; DIAG[/diagnostics/]
+    BG --&gt; DIAG
+    TRK --&gt; DIAG</pre><p>Для скорости разработки несколько логических стадий можно объединить в один процесс с composable nodes. Границы сообщений сохраняются концептуально, чтобы позже профилировать и заменять компоненты.</p>
+<h3 id="152-рекомендуемое-сообщение-препятствия">15.2. Рекомендуемое сообщение препятствия</h3>
+<p>Это проект расширенного интерфейса, не существующая или обязательная по ТЗ <code>.msg</code>-схема. Первый выход содержит detection status, nearest distance с признаками валидности/точкой отсчёта, header и system status. Неизмеренные скорость, confidence и риск нельзя заполнять правдоподобными значениями; они отсутствуют либо явно invalid.</p>
+<pre><code class="language-text">Obstacle
+  std_msgs/Header header
+  uint64 track_id
+  geometry_msgs/Pose pose
+  geometry_msgs/Vector3 size
+  geometry_msgs/Twist relative_velocity
+  float32 longitudinal_distance_m
+  float32 envelope_intrusion
+  float32 detection_confidence
+  uint8 risk_level
+  uint8 track_state
+  uint32 supporting_points
+  string[] flags
+
+ObstacleArray
+  std_msgs/Header header
+  Obstacle[] obstacles
+  uint8 system_status
+  string status_reason
+  float32 processing_latency_ms</code></pre><p>Поля и enum-значения должны быть оформлены реальными <code>.msg</code> после проверки существующих интерфейсов организаторов.</p>
+<h3 id="153-qos-и-эксплуатационные-правила">15.3. QoS и эксплуатационные правила</h3>
+<ul>
+<li>Для облака обычно нужен профиль sensor data: предпочтительна свежесть, а не накопление старых кадров.</li>
+<li>Для итоговых предупреждений выбор reliability и history согласуется с потребителем.</li>
+<li>Каждый output содержит timestamp исходного облака и frame ID.</li>
+<li>При перегрузке система пропускает устаревшие кадры, но не скрывает degraded status.</li>
+<li>Параметры вынесены в ROS2 YAML; версия конфигурации записывается вместе с результатами.</li>
+</ul>
+<hr>
+<h2 id="16-псевдокод">16. Псевдокод</h2>
+<blockquote>
+<p>Псевдокод возможного расширенного решения, не буквальное описание вызываемых сейчас функций.</p>
+</blockquote>
+<h3 id="161-обработка-кадра">16.1. Обработка кадра</h3>
+<p>Концептуальная последовательность, не выполняемый код. Флаги расширений выключены для первого baseline; валидация требует только входы активного режима.</p>
+<pre><code class="language-python">def process_frame(cloud_msg, tf_buffer, tunnel_map, tracks, config):
+    diagnostics = validate_cloud_and_timing(cloud_msg, tf_buffer, config)
+    if not diagnostics.input_valid:
+        return obstacle_array(status=&quot;DEGRADED&quot;, reason=diagnostics.reason)
+
+    points = decode_valid_points_with_counters(cloud_msg)  # schema, finite, zero returns
+
+    if config.deskew_enabled:
+        if not point_times_and_motion_valid(cloud_msg, config):
+            return obstacle_array(status=&quot;DEGRADED&quot;, reason=&quot;DESKEW_INPUT_INVALID&quot;)
+        points = deskew(points, config.motion_source, reference_time=cloud_msg.header.stamp)
+
+    if cloud_msg.header.frame_id != config.working_frame:
+        points = transform_with_validated_contract(points, tf_buffer, config)
+    points = crop_by_range_and_broad_roi(points, config)
+    points = distance_aware_voxelize(points, config.range_bands)
+
+    envelope = build_envelope(
+        train_profile=config.train_profile,
+        path=available_path_or_straight_fallback(),
+        uncertainty=current_alignment_uncertainty(),
+    )
+
+    if not envelope.valid:
+        return obstacle_array(status=&quot;UNKNOWN&quot;, reason=&quot;ENVELOPE_INVALID&quot;)
+
+    background_ok = (config.background_enabled and tunnel_map.available
+                     and evaluate_alignment(points, tunnel_map).acceptable)
+    if background_ok:
+        residual = subtract_background(points, tunnel_map, config.range_bands)
+    else:
+        if config.background_enabled and not config.validated_envelope_only_fallback:
+            return obstacle_array(status=&quot;UNKNOWN&quot;, reason=&quot;BACKGROUND_INVALID&quot;)
+        residual = points  # no unverified ground/rail suppression
+        diagnostics.add_flag(&quot;BACKGROUND_BYPASSED&quot;)
+
+    candidates = select_points_in_warning_envelope(residual, envelope)
+    clusters = distance_aware_cluster(candidates, config.range_bands)
+
+    detections = []
+    for cluster in clusters:
+        features = geometry_features(cluster, envelope)  # PCA optional
+        if passes_non_semantic_quality_gate(features, config):
+            detections.append(make_detection(cluster, features))
+
+    obstacles = detections
+    if config.temporal_enabled:
+        tracks = associate_and_update(tracks, detections, validated_event_time(cloud_msg))
+        obstacles = temporal_decision_with_immediate_intrusion(tracks, detections, config)
+    if config.risk_enabled:
+        obstacles = assess_risk_only_with_valid_inputs(obstacles, envelope, diagnostics)
+
+    status = combine_system_and_obstacle_status(diagnostics, obstacles)
+    return detection_result(obstacles=obstacles, status=status,
+                            nearest_distance=validated_nearest_distance(obstacles, config))</code></pre><h3 id="162-безопасное-обновление-background">16.2. Безопасное обновление background</h3>
+<pre><code class="language-python">def propose_background_update(sequence, current_map, evidence):
+    if not evidence.externally_declared_clean:
+        return reject(&quot;sequence is not approved as clean&quot;)
+    if evidence.contains_confirmed_intrusion:
+        return reject(&quot;obstacle candidates present&quot;)
+    if not evidence.localization_quality_ok:
+        return reject(&quot;alignment quality insufficient&quot;)
+
+    proposal = accumulate_visibility_aware_occupancy(sequence, current_map)
+    if not repeated_across_independent_runs(proposal, evidence):
+        return quarantine(proposal, &quot;needs independent-run support&quot;)
+    if not passes_offline_regression(proposal):
+        return reject(&quot;regression detected&quot;)
+
+    return approve_as_new_version(proposal)  # never overwrite the active map in-place</code></pre><h3 id="163-distance-aware-clustering-по-зонам">16.3. Distance-aware clustering по зонам</h3>
+<pre><code class="language-python">def distance_aware_cluster(points, bands):
+    partial = []
+    for band in bands:
+        band_points = select_with_overlap(points, band.range, band.overlap)
+        tree = KDTree(band_points)
+        clusters = euclidean_components(
+            tree,
+            radius=band.cluster_radius,
+            min_points=band.min_points,
+        )
+        partial.extend(clusters)
+    return merge_overlapping_band_clusters(partial)</code></pre><hr>
+<h2 id="17-калибровка-метрики-и-протокол-оценки">17. Калибровка, метрики и протокол оценки</h2>
+<blockquote>
+<p>Протокол оценки. Наличие метрик в определении не означает их измерение; текущие development-числа и ограничения — в отчётах по сдаче.</p>
+</blockquote>
+<h3 id="171-разделение-данных">17.1. Разделение данных</h3>
+<p>Параметры нельзя подбирать на тех же последовательностях, на которых объявляется итоговое качество. Единицей разделения должен быть <strong>целый проезд/сценарий/участок</strong>, а не случайные кадры: соседние кадры почти идентичны и создают утечку.</p>
+<p>Рекомендуется:</p>
+<ul>
+<li><code>development</code>: разработка и отладка;</li>
+<li><code>calibration</code>: подбор порогов, весов и временных окон;</li>
+<li><code>held-out test</code>: однократная итоговая оценка;</li>
+<li>по возможности отдельный тест на другом проезде или участке тоннеля.</li>
+</ul>
+<p>Чистые проезды для построения карты не должны содержать тестовые препятствия, по которым оценивается детекция.</p>
+<p>В текущем наборе только <code>doubleT_obstacle</code> явно обозначен как obstacle; количество реальных событий ещё не установлено. Если это единственная подтверждённая положительная запись и она используется для разработки/калибровки, независимой оценки положительного recall нет. Разбиение соседних кадров не исправляет это ограничение. Нужны дополнительные независимые положительные сценарии; остальные bag после просмотра могут служить проверкой FP и переноса на инфраструктуру. Synthetic вставки проверяют отдельные свойства метода, но не заменяют полевую оценку. Фиксировать назначение каждого проезда до настройки, включая возможное совпадение участков между записями.</p>
+<h3 id="172-уровни-оценки">17.2. Уровни оценки</h3>
+<p><strong>Point-level</strong> полезен только для анализа вычитания фона, если есть разметка точек. Главными должны быть object/event-level метрики.</p>
+<p><strong>Object-level matching.</strong> Детекция сопоставляется с эталоном по 3D IoU, расстоянию между центрами либо попаданию в допустимую область вокруг объекта. Критерий фиксируется до теста.</p>
+<p><strong>Event-level.</strong> Одно физическое препятствие в последовательности считается одним событием, а не десятками независимых кадров.</p>
+<h3 id="173-основные-метрики">17.3. Основные метрики</h3>
+<p><span class="math-block">\[
+\mathrm{Precision}=\frac{TP}{TP+FP},
+\qquad
+\mathrm{Recall}=\frac{TP}{TP+FN},
+\]</span></p>
+<p><span class="math-block">\[
+F_\beta=(1+\beta^2)
+\frac{\mathrm{Precision}\cdot\mathrm{Recall}}
+{\beta^2\mathrm{Precision}+\mathrm{Recall}}.
+\]</span></p>
+<p>Для safety-задачи можно выбрать <span class="math-inline">\(\beta&gt;1\)</span>, если стоимость пропуска выше стоимости ложной тревоги; конкретный выбор согласуется с владельцем задачи.</p>
+<p>Дополнительно измеряются:</p>
+<ul>
+<li>false alarms на минуту или километр;</li>
+<li>доля проездов без ложных тревог;</li>
+<li>максимальная и распределённая по квантилям дальность устойчивого обнаружения;</li>
+<li>detection latency: от первого физически наблюдаемого кадра до подтверждения;</li>
+<li>tracking continuity и число смен <code>track_id</code>;</li>
+<li>ошибка расстояния и размеров;</li>
+<li>средняя, p95 и максимальная задержка на кадр;</li>
+<li>пропускная способность и доля отброшенных кадров;</li>
+<li>доля времени в <code>DEGRADED</code>;</li>
+<li>память и CPU/GPU, если GPU используется.</li>
+</ul>
+<p>FP/км считать только при достоверной пройденной дистанции; при отсутствии одометрии основной показатель — FP/мин. Раздельно измерять дальность первого и устойчивого обнаружения реального события. Максимальная дальность отдельной точки не является дальностью детектора. Диапазоны 100/200/300 м из ТЗ — ориентиры оценки, не гарантированный acceptance и не основание экстраполировать за наблюдаемость набора.</p>
+<p>Около 10 Гц даёт инженерный ориентир порядка 100 мс на кадр. Отчёт дополнительно содержит очередь/отставание, dropped frames, p95, длительность replay и оборудование; отдельно проверяется втрое более объёмный obstacle-вход. Время вычислений и задержку обнаружения не смешивать с разностью несогласованных часов bag/header.</p>
+<p>Для текущего headless ROS2/C++ path воспроизводимый замер без browser/HTTP
+player выполняется скриптом <code>scripts/measure_headless_ros2_cpp_performance.py</code>;
+он запускает <code>ros2 bag play</code>, собирает JSON-выход detector node, считает
+p50/p95/p99/max по <code>processing_ms</code> и сохраняет <code>docker stats</code>. Для оценки
+вычислительного бюджета detector node используется <code>diagnostics_detail=summary</code>;
+полный diagnostic JSON с массивами индексов оставлен для viewer/debug.</p>
+<h3 id="174-срезы-качества">17.4. Срезы качества</h3>
+<p>Метрики отчётно разбиваются по:</p>
+<ul>
+<li>ближней/средней/дальней зоне;</li>
+<li>малым/средним/крупным объектам;</li>
+<li>типу участка тоннеля;</li>
+<li>статическим и движущимся объектам;</li>
+<li>наличию воды, отражений, пыли и окклюзии;</li>
+<li>качеству локализации;</li>
+<li>пересечению <code>inside</code> против <code>warning margin</code>.</li>
+</ul>
+<h3 id="175-абляции">17.5. Абляции</h3>
+<p>План сравнений: сначала baseline, затем отдельные включённые улучшения на тех же данных. Не реализованные или неприменимые варианты маркируются, а не блокируют сдачу.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Конфигурация</th>
+<th align="right">Recall при наличии независимой разметки</th>
+<th align="right">FP/мин</th>
+<th align="right">Дальность устойчивой детекции</th>
+<th align="right">p95, мс/кадр</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Envelope-only baseline</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+</tr>
+<tr>
+<td>+ Background subtraction</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+</tr>
+<tr>
+<td>+ Distance-aware clustering</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+</tr>
+<tr>
+<td>+ Temporal confirmation</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+<td align="right">измерить</td>
+</tr>
+</tbody></table></div>
+<p>Таблица не содержит результатов. Для совокупности улучшений дополнительно указать, какие стадии включены; нельзя приписывать эффект одной стадии, если одновременно менялись другие.</p>
+<h3 id="176-acceptance-boundaries">17.6. Acceptance boundaries</h3>
+<p>ТЗ не задаёт строгих численных границ acceptance. Их уточняют у организатора/инженера безопасности; до этого используются проектные критерии с явными ограничениями доступной разметки:</p>
+<ul>
+<li>отсутствие пропуска доступных размеченных критических событий на held-out наборе;</li>
+<li>документированный FP rate в расчёте на время/дистанцию;</li>
+<li>p95 latency ниже периода, при котором система начинает устойчиво отставать от потока;</li>
+<li>гарантированный <code>DEGRADED</code> при потере критических входов;</li>
+<li>воспроизводимость результата с зафиксированной конфигурацией.</li>
+</ul>
+<hr>
+<h2 id="18-mvp-и-критерии-готовности">18. MVP и критерии готовности</h2>
+<blockquote>
+<p>Требования/критерии, не свидетельство выполнения. Реализованное и оставшиеся шаги перечислены в DEVELOPMENT_HISTORY_AND_STATUS.</p>
+</blockquote>
+<h3 id="181-mvp">18.1. MVP</h3>
+<blockquote>
+<p>ROS2-модуль в Docker Humble принимает <code>PointCloud2</code>, проверяет вход, анализирует локальный габарит в установленной системе координат и публикует наличие препятствия, расстояние до ближайшего и диагностический статус. Есть воспроизводимый replay, визуализация и первые измерения.</p>
+</blockquote>
+<h3 id="182-обязательно">18.2. Обязательно</h3>
+<ul>
+<li>Docker на Ubuntu 22.04 + ROS 2 Humble с автоматической установкой зависимостей;</li>
+<li>воспроизводимое чтение обоих топиков/вариантов облака через параметр или remapping;</li>
+<li>проверенный вход, геометрия и envelope-only baseline с кластеризацией;</li>
+<li>наличие препятствия, ближайшее расстояние и diagnostics;</li>
+<li>визуализация raw cloud, envelope и кандидатов;</li>
+<li>сценарные эксперименты и профилирование с границами доказательств;</li>
+<li>параметры в конфигурации; README со сборкой, запуском, replay и параметрами;</li>
+<li>исходный код, описание архитектуры/алгоритма, короткое видео и демонстрация на контрольном bag.</li>
+</ul>
+<p>Baseline и diagnostics — выбранные инженерные требования проекта. ТЗ не предписывает конкретный алгоритм или формат ROS-сообщения. На промежуточную сдачу требуются Dockerfile и/или образ, работающий прототип, краткое описание подхода, минимальная демонстрация и первые эксперименты; финальная сдача включает все материалы выше.</p>
+<h3 id="183-желательно">18.3. Желательно</h3>
+<ul>
+<li>distance-aware фильтрация/кластеризация после измерений baseline;</li>
+<li>подавление штатной геометрии при подтверждённых условиях применения;</li>
+<li>temporal confirmation с измерением задержки и немедленным предупреждением о близком/глубоком intrusion;</li>
+<li>bounding boxes, PCA-признаки, track ID и скорость при достаточных входах;</li>
+<li>локализованная voxel map, deskew и risk/TTC только после отдельной проверки входов;</li>
+<li>автоматический отчёт по абляциям и replay на независимых сценариях.</li>
+</ul>
+<h3 id="184-не-входит-в-обязательный-mvp">18.4. Не входит в обязательный MVP</h3>
+<ul>
+<li>семантическая классификация всех объектов;</li>
+<li>обучение 3D‑нейросети без достаточной разметки;</li>
+<li>полноценный SLAM, если организаторы не дали локализацию;</li>
+<li>production-сертификация;</li>
+<li>автоматическое online-обновление доверенной карты;</li>
+<li>прямое управление поездом.</li>
+</ul>
+<hr>
+<h2 id="19-план-этапов">19. План этапов</h2>
+<blockquote>
+<p>Историческая декомпозиция этапов; очередность актуальных работ задаёт DEVELOPMENT_HISTORY_AND_STATUS.</p>
+</blockquote>
+<p>Актуальные задачи, распределение работы и критерии перехода хранятся в <a href="DEVELOPMENT_HISTORY_AND_STATUS.md">истории и статусе работ</a>. Этот документ задаёт последовательность этапов, а не сроки из ТЗ и не число рабочих дней.</p>
+<p>Порядок: этап 1 — Docker Humble и оба входных формата; этап 2 — контракт геометрии/времени и реестр событий; этапы 3–4 — сквозной baseline, измерения и промежуточная демонстрация; этапы 5–6 — проверяемые улучшения и устойчивость; этапы 7–8 — воспроизводимость, финальные материалы и фиксация версии.</p>
+<h3 id="191-точки-отсечения-scope">19.1. Точки отсечения scope</h3>
+<ul>
+<li>Если после этапа 2 неизвестны оси/extrinsics/габарит, продолжить аудит и визуализацию, но не подменять frame на <code>base_link</code> и не заявлять свободный путь.</li>
+<li>Если baseline не обнаруживает видимые объекты, отложить tracking, ML и карту; проверить входы, ROI и кластеризацию.</li>
+<li>Если карта не даёт устойчивого улучшения либо нет эталона/совмещения, оставить envelope-only без непроверенного подавления внутри габарита.</li>
+<li>На этапе 8 новые функции не добавлять.</li>
+</ul>
+<hr>
+<h2 id="20-риски-и-fallback-стратегии">20. Риски и fallback-стратегии</h2>
+<blockquote>
+<p>Проектные fallback-стратегии расширенного решения; текущая покадровая цепочка при отсутствии необходимой опоры сохраняет UNKNOWN и не включает карту/tracking автоматически.</p>
+</blockquote>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Риск</th>
+<th>Наблюдаемый признак</th>
+<th>Основная мера</th>
+<th>Fallback для MVP</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Нет/плохая одометрия</td>
+<td>нет источника движения или большой alignment residual</td>
+<td>проверка доступного движения, ICP/NDT по статике как отдельный эксперимент</td>
+<td>покадровый режим в проверенном frame без накопления</td>
+</tr>
+<tr>
+<td>Ошибка extrinsics</td>
+<td>систематическое смещение карты/габарита</td>
+<td>калибровка и residual QA</td>
+<td>отключить map subtraction; при невалидном габарите UNKNOWN, не маскировать ошибку допуском</td>
+</tr>
+<tr>
+<td>Motion distortion</td>
+<td>раздвоение стен/объектов</td>
+<td>deskew по per-point time и валидной оценке движения</td>
+<td>ограничить область применимости по измерениям, при нарушении контракта degraded</td>
+</tr>
+<tr>
+<td>Нет чистого проезда</td>
+<td>фон содержит препятствия</td>
+<td>внешняя верификация карты</td>
+<td>envelope-only baseline</td>
+</tr>
+<tr>
+<td>Карта запоминает объект</td>
+<td>новый объект исчезает из residual</td>
+<td>immutable map, offline update</td>
+<td>полностью запретить online update</td>
+</tr>
+<tr>
+<td>Редкие кабели дают FP</td>
+<td>стабильные residual у стен</td>
+<td>multi-run occupancy + envelope</td>
+<td>статические masks только вне safety zone</td>
+</tr>
+<tr>
+<td>Малый дальний объект фрагментируется</td>
+<td>много малых соседних кластеров</td>
+<td>distance-aware radius/min-points</td>
+<td>диапазонные зоны с ручной калибровкой</td>
+</tr>
+<tr>
+<td>Дальние кластеры склеиваются</td>
+<td>чрезмерно большие boxes</td>
+<td>cap radius, overlap merge rules</td>
+<td>ограничить дальность достоверной выдачи</td>
+</tr>
+<tr>
+<td>Низкое препятствие удаляется как путь</td>
+<td>FN возле рельсов</td>
+<td>не удалять путь общей плоскостью</td>
+<td>оставить точки внутри envelope</td>
+</tr>
+<tr>
+<td>Отражения/пыль</td>
+<td>краткие нестабильные кластеры</td>
+<td>temporal confirmation</td>
+<td>более строгий k-of-L вне critical zone</td>
+</tr>
+<tr>
+<td>Temporal filter задерживает тревогу</td>
+<td>позднее первое предупреждение</td>
+<td>отдельное tentative high-risk</td>
+<td>немедленный WATCH для глубокого intrusion</td>
+</tr>
+<tr>
+<td>CPU не успевает</td>
+<td>растёт очередь кадров</td>
+<td>early crop, voxel, профилирование</td>
+<td>latest-frame policy, объединение нод</td>
+</tr>
+<tr>
+<td>Порог переобучен</td>
+<td>падение качества на новом проезде</td>
+<td>split by run/segment</td>
+<td>консервативная фиксированная конфигурация</td>
+</tr>
+<tr>
+<td>Нет разметки</td>
+<td>невозможно посчитать recall</td>
+<td>минимальная event-level разметка</td>
+<td>сценарные synthetic insertions с оговорками</td>
+</tr>
+<tr>
+<td>Потеря входа</td>
+<td>пустой output выглядит как clear</td>
+<td>explicit diagnostics</td>
+<td><code>DEGRADED</code>, никогда не <code>CLEAR</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="201-иерархия-fallback">20.1. Иерархия fallback</h3>
+<pre><code class="language-text">Уровень 3: локализованная multi-run voxel map + curved envelope + tracking
+    ↓ если нет надёжной глобальной локализации, но локальное совмещение проверено
+Уровень 2: локальный background + straight envelope + temporal confirmation
+    ↓ если background/совмещение недоступны, но локальный габарит валиден
+Уровень 1: envelope-only + clustering + conservative warning
+    ↓ если входные данные невалидны
+Уровень 0: DEGRADED / UNKNOWN, без утверждения &quot;путь свободен&quot;</code></pre><hr>
+<h2 id="21-матрица-трассируемости-метода">21. Матрица трассируемости метода</h2>
+<blockquote>
+<p>Матрица проектного метода, включая нереализованные расширения. Не использовать как перечень текущих runtime-компонентов.</p>
+</blockquote>
+<p>Матрица охватывает расширенную архитектуру. Фон, совмещение, PCA, время и риск проверяются только при включении соответствующего режима; первый baseline использует наблюдение, валидный габарит, кластеры, расстояние и диагностику.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Шаг</th>
+<th>Объект</th>
+<th>Допущение</th>
+<th>Вычисление/решение</th>
+<th>Выход</th>
+<th>Эмпирическая проверка</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Наблюдение</td>
+<td><span class="math-inline">\(\mathcal P_t^L\)</span></td>
+<td>поля и единицы известны</td>
+<td>decode + quality gate</td>
+<td>валидное raw cloud</td>
+<td>статистика полей, ручная визуализация</td>
+</tr>
+<tr>
+<td>Совмещение</td>
+<td><span class="math-inline">\(T_{F\leftarrow L}(t)\)</span></td>
+<td>TF/odometry синхронны</td>
+<td>transform/deskew</td>
+<td><span class="math-inline">\(\mathcal P_t^F\)</span></td>
+<td>residual на статике</td>
+</tr>
+<tr>
+<td>Контекст</td>
+<td><span class="math-inline">\(\mathcal E_t^{safe}\)</span></td>
+<td>известен профиль и путь либо fallback</td>
+<td>sweep/призма + margin</td>
+<td>inside/margin/outside</td>
+<td>визуальная проверка по сценариям</td>
+</tr>
+<tr>
+<td>Представление фона</td>
+<td><span class="math-inline">\(\mathcal B,\hat p_{occ}\)</span></td>
+<td>есть чистые повторные проезды</td>
+<td>visibility-aware occupancy</td>
+<td>trusted static voxels</td>
+<td>стабильность между проездами</td>
+</tr>
+<tr>
+<td>Change detection</td>
+<td><span class="math-inline">\(\delta_{bg}(p)\)</span></td>
+<td>alignment приемлем</td>
+<td>nearest background distance</td>
+<td>residual points</td>
+<td>FP на чистых проездах</td>
+</tr>
+<tr>
+<td>Кластеризация</td>
+<td>граф соседства</td>
+<td>локальная плотность описана зонами</td>
+<td>KD-tree components/DBSCAN</td>
+<td>clusters</td>
+<td>object-level recall/fragmentation</td>
+</tr>
+<tr>
+<td>Геометрия</td>
+<td><span class="math-inline">\(\Sigma_j,\lambda_k,B_j\)</span></td>
+<td>кластер представляет объект</td>
+<td>PCA + bounding box</td>
+<td>features</td>
+<td>устойчивость по кадрам/дальности</td>
+</tr>
+<tr>
+<td>Время</td>
+<td>треки и <span class="math-inline">\(z_{q,t}\)</span></td>
+<td>соседние наблюдения ассоциируемы</td>
+<td>matching + k-of-L</td>
+<td>confirmed tracks</td>
+<td>event recall, confirmation latency</td>
+</tr>
+<tr>
+<td>Риск</td>
+<td><span class="math-inline">\(G,D,T,C,U\)</span></td>
+<td>признаки нормированы и откалиброваны</td>
+<td>score + policy</td>
+<td>WATCH/WARNING/CRITICAL</td>
+<td>сценарная матрица и review</td>
+</tr>
+<tr>
+<td>Неопределённость</td>
+<td>diagnostics</td>
+<td>ошибки обнаружимы</td>
+<td>fail-state rules</td>
+<td>DEGRADED</td>
+<td>fault injection</td>
+</tr>
+</tbody></table></div>
+<h3 id="211-статус-утверждений">21.1. Статус утверждений</h3>
+<ul>
+<li><strong>Определённый baseline:</strong> envelope-first, геометрические кандидаты/кластеры, ближайшее расстояние и explicit degraded state. Background subtraction, distance-aware и temporal confirmation — проверяемые расширения.</li>
+<li><strong>Требуют подтверждения:</strong> калибровка, единицы/оси, габарит, монотонность и связь часов, достаточность возвратов от реального препятствия. Первичный аудит не установил эти контракты полностью.</li>
+<li><strong>Следствие при допущениях:</strong> стабильная штатная геометрия может подавляться без знания её семантического класса.</li>
+<li><strong>Проверяемая гипотеза:</strong> distance-aware параметры увеличат дальность/recall малых объектов без неприемлемого роста FP.</li>
+<li><strong>Проверяемая гипотеза:</strong> background subtraction снизит FP от инфраструктуры по сравнению с envelope-only baseline.</li>
+<li><strong>Не проверено:</strong> конкретная дальность, recall, FP rate, latency и пригодность для эксплуатации.</li>
+</ul>
+<hr>
+<h2 id="22-ограничения-и-дальнейшее-развитие">22. Ограничения и дальнейшее развитие</h2>
+<p>После MVP архитектуру можно расширить:</p>
+<ul>
+<li>learned point-wise segmentation как дополнительный признак, а не единственный safety gate;</li>
+<li>uncertainty-aware localization и распространение ковариации в margin envelope;</li>
+<li>автоматизированная, но версионируемая модерация изменений карты;</li>
+<li>multi-lidar fusion;</li>
+<li>более строгий probabilistic occupancy/ray tracing;</li>
+<li>model predictive envelope с учётом скорости и кривизны пути;</li>
+<li>аппаратное ускорение и zero-copy transport;</li>
+<li>safety case, hazard analysis, fault injection и независимый канал контроля.</li>
+</ul>
+<p>Приоритет — корректно измерять и дорабатывать уже реализованную цепочку. Эффекты background subtraction, distance-aware и temporal пока остаются гипотезами; их включение определяется отдельным сравнением и наличием необходимых входов. Текущая очередность — в <a href="DEVELOPMENT_HISTORY_AND_STATUS.md">истории и статусе</a>.</p>
+<hr>
+<h2 id="приложение-a-эскиз-параметров-конфигурации">Приложение A. Эскиз параметров конфигурации</h2>
+<p>Это не запускаемый YAML: значения <code>VERIFY</code>/<code>CALIBRATE</code> должны быть установлены и проверены при реализации. Настройки расширений не обязательны для baseline. <a href="../config/geometry_contract.yaml"><code>config/geometry_contract.yaml</code></a> содержит отдельный <code>ASSUMED_HACKATHON</code> профиль: он разрешает demo-кандидат и приближённую дистанцию с явной меткой, но запрещает <code>CLEAR/NO_OBSTACLE</code> и safety-решение. Для production действуют только <code>VERIFIED</code> frame, единицы, профиль, путь и envelope.</p>
+<pre><code class="language-yaml">input:
+  topic: SELECT_OR_REMAP
+  zero_return_policy: VERIFY
+
+frames:
+  lidar: VERIFY_FROM_INPUT
+  working: VERIFIED_FRAME     # same as lidar only with validated envelope
+  forward_axis: VERIFY
+
+timing:
+  event_time_source: VERIFY
+  bag_header_clock_relation: VERIFY
+  deskew_enabled: false
+
+roi:
+  forward_range_m: CALIBRATE
+  rear_range_m: CALIBRATE
+  train_profile: INPUT_FROM_DOMAIN_OWNER
+  safety_margin_m: INPUT_AND_CALIBRATE
+
+background:
+  mode: disabled              # enable only after reference/alignment validation
+  residual_tolerance_by_band: CALIBRATE
+  min_visibility_count: CALIBRATE
+  trusted_occupancy_probability: CALIBRATE
+  online_update: false
+
+range_bands:
+  - range_m: CALIBRATE
+    voxel_size_m: CALIBRATE
+    cluster_radius_m: CALIBRATE
+    min_points: CALIBRATE
+
+tracking:
+  enabled: false
+  association_gate_m: CALIBRATE
+  confirmation_k: CALIBRATE
+  confirmation_window_frames: CALIBRATE
+  max_misses: CALIBRATE
+
+risk:
+  enabled: false
+  thresholds: INPUT_AND_CALIBRATE
+  weights: CALIBRATE
+
+runtime:
+  latency_budget_ms: INPUT_FROM_SYSTEM_OWNER
+  stale_tf_limit_ms: CALIBRATE
+  publish_diagnostics: true</code></pre><h2 id="приложение-b-контрольные-вопросы-демонстрации">Приложение B. Контрольные вопросы демонстрации</h2>
+<p>Фактический статус сдачного комплекта фиксируется в <a href="SUBMISSION_CHECKLIST.md">SUBMISSION_CHECKLIST.md</a> и датированных отчётах <code>docs/reports/submission/</code>. Список ниже оставлен как методический контроль качества демонстрации, а не как отдельный незакрытый checklist.</p>
+<ul>
+<li>Docker собирается и запускается в Ubuntu 22.04 / Humble без ручной установки зависимостей.</li>
+<li>README содержит проверенные команды build/run/replay, параметры и способ выбора топика.</li>
+<li>Воспроизведены известные входные варианты; новый путь bag не требует изменения кода.</li>
+<li>Зафиксированы версии кода, образа и YAML; карта указана только если используется.</li>
+<li>Видны raw cloud, envelope, кандидаты и результат «препятствие + расстояние»; residual/tracks — только если включены.</li>
+<li>Есть вручную проверенный чистый интервал для FP и подтверждённое событие препятствия; ограничения разметки названы.</li>
+<li>Измерены дальность первого/устойчивого обнаружения, FP/мин, p95, очередь и dropped frames с указанием оборудования.</li>
+<li>Улучшения, если включены, сравнены с baseline на одинаковых данных.</li>
+<li>Продемонстрирован <code>DEGRADED/UNKNOWN</code> при потере нужных входов или невалидном габарите; потеря TF тестируется только в режиме, который его требует.</li>
+<li>Подготовлены исходники, описание архитектуры/алгоритма, эксперименты и короткое видео.</li>
+<li>Подготовлен запуск для контрольного bag организаторов; успешное прохождение неизвестного теста заранее не заявляется.</li>
+<li>Ограничения сформулированы явно; нет заявления о production-ready безопасности.</li>
+</ul>
+<h2 id="приложение-c-концептуальная-литература">Приложение C. Концептуальная литература</h2>
+<ul>
+<li>Jean Gallier, Jocelyn Quaintance. <em>Algebra, Topology, Differential Calculus, and Optimization Theory for Computer Science and Machine Learning</em> — справочный источник по геометрическим преобразованиям, линейной алгебре и оптимизации: <a href="https://www.cis.upenn.edu/~jean/gbooks/geomath.html">https://www.cis.upenn.edu/~jean/gbooks/geomath.html</a>.</li>
+</ul>
+</main>
+<script type="module">
+try{const {default:mermaid}=await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'neutral'});await mermaid.run({querySelector:'.mermaid'});}catch(error){console.warn('Mermaid unavailable; source diagram retained',error);}
+</script></body></html>
